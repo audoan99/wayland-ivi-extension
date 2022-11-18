@@ -31,36 +31,239 @@
 
 #include "ilm_control.h"
 
+#define MY_PATH_FILE        "/home/pinx/Downloads/wayland-ivi-extension/ivi-layermanagement-examples/layer-add-surfaces/location.txt"
+
 t_ilm_uint screenWidth;
 t_ilm_uint screenHeight;
+
 static t_ilm_uint layer = 0;
 pthread_mutex_t mutex;
 static pthread_cond_t  waiterVariable = PTHREAD_COND_INITIALIZER;
 static int number_of_surfaces = 0;
 char display_name[256] = {0};
 
+typedef struct
+{
+    t_ilm_uint locationX1;
+    t_ilm_uint locationY1;
+    t_ilm_uint locationX2;
+    t_ilm_uint locationY2;
+    t_ilm_uint width;
+    t_ilm_uint height;
+} t_surface;
+
+void writeFile(t_surface* t_s)
+{
+    FILE *fptr;
+    fptr = fopen(MY_PATH_FILE, "a");
+
+    if(fptr == NULL)
+    {
+        printf("Can not open this file!\n");
+        exit(1);
+    }
+
+    fprintf(fptr, "%d,", t_s->locationX1);
+    fprintf(fptr, "%d,", t_s->locationY1);
+    fprintf(fptr, "%d,", t_s->width + t_s->locationX1);
+    fprintf(fptr, "%d\n", t_s->height + t_s->locationY1);
+
+    fclose(fptr);
+}
+
+void readFile(t_surface* prev_surface, uint count)
+{
+    int num;
+    FILE *fptr;
+ 
+    if ((fptr = fopen(MY_PATH_FILE,"r")) == NULL)
+    {
+        printf("Can not open this file!\n");
+        exit(1);
+    }
+
+    for(uint i = 0; i < count * 4; i++)
+    {
+        if(i == (count * 4 - 4)) 
+        {
+            fscanf(fptr,"%d", &num);
+            prev_surface->locationX1 = num;
+        }
+        else if(i == (count * 4 - 3))
+        {
+            fscanf(fptr,"%d", &num);
+            prev_surface->locationY1 = num;
+        }
+        else if(i == (count * 4 - 2))
+        {
+            fscanf(fptr,"%d", &num);
+            prev_surface->locationX2 = num;
+        }
+        else if(i == (count * 4 - 1))
+        {
+            fscanf(fptr,"%d", &num);
+            prev_surface->locationY2 = num;
+        }
+        else
+        {
+            fscanf(fptr,"%d", &num);
+        }
+        fgetc(fptr);
+    }
+    fclose(fptr);
+}
+
+void clearFile()
+{
+    fclose(fopen(MY_PATH_FILE, "w"));
+}
+
+void randLocation(t_surface* new_surface, t_ilm_uint width, t_ilm_uint height)
+{
+    new_surface->locationX1 = rand() % (screenWidth - width);
+    new_surface->locationY1 = rand() % (screenHeight - height);
+    new_surface->locationX2 = new_surface->locationX1 + width; 
+    new_surface->locationY2 =  new_surface->locationY1 + height;
+    new_surface->width = width;
+    new_surface->height = height;
+}
+
+static uint my_count = 0;
+uint getLocation(t_surface* new_surface, t_ilm_uint width, t_ilm_uint height)
+{
+    printf("My_count: %d\n", my_count);
+    randLocation(new_surface, width, height);
+
+    if(!my_count)
+    {
+        writeFile(new_surface);
+        ++my_count;
+    }
+    else
+    {
+        t_surface prev_surface;
+        uint checkReturn = 0;
+        while(1)
+        {
+            uint state = 0;
+            ++checkReturn;
+            if(checkReturn > (screenWidth * screenHeight)) return 0;
+
+            for(uint i = 1; i <= my_count; i++)
+            {
+                readFile(&prev_surface, i);
+                // printf("Previous Surface %d: %d-%d-%d-%d\n",i, prev_surface.locationX1, prev_surface.locationY1, prev_surface.locationX2, prev_surface.locationY2);
+
+                if((new_surface->locationX1 >= prev_surface.locationX1) && (new_surface->locationX1 <= prev_surface.locationX2) 
+                && (new_surface->locationY1 >= prev_surface.locationY1) && (new_surface->locationY1 <= prev_surface.locationY2))
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+
+                if((new_surface->locationX1 >= prev_surface.locationX1) && (new_surface->locationX1 <= prev_surface.locationX2) 
+                    && (new_surface->locationY2 >= prev_surface.locationY1) && (new_surface->locationY2 <= prev_surface.locationY2))
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+
+                if((new_surface->locationX2 >= prev_surface.locationX1) && (new_surface->locationX2 <= prev_surface.locationX2) 
+                    && (new_surface->locationY1 >= prev_surface.locationY1) && (new_surface->locationY1 <= prev_surface.locationY2))
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+
+                if((new_surface->locationX2 >= prev_surface.locationX1) && (new_surface->locationX2 <= prev_surface.locationX2) 
+                    && (new_surface->locationY2 >= prev_surface.locationY1) && (new_surface->locationY2 <= prev_surface.locationY2))
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+                
+                if((prev_surface.locationX1 >= new_surface->locationX1) && (prev_surface.locationX2 <= new_surface->locationX2)
+                    && (prev_surface.locationY1 >= new_surface->locationY1) && (prev_surface.locationY1 <= new_surface->locationY2)) 
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+                
+                if((prev_surface.locationX1 >= new_surface->locationX1) && (prev_surface.locationX2 <= new_surface->locationX2)
+                    && (prev_surface.locationY2 <= new_surface->locationY1) && (prev_surface.locationY2 <= new_surface->locationY2))
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+                
+                if((prev_surface.locationX1 >= new_surface->locationX1) && (prev_surface.locationX1 <= new_surface->locationX2)
+                    && (prev_surface.locationY1 >= new_surface->locationY1) && (prev_surface.locationY2 <= new_surface->locationY2)) 
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+                if((prev_surface.locationX2 >= new_surface->locationX1) && (prev_surface.locationX2 <= new_surface->locationX2)
+                    && (prev_surface.locationY1 >= new_surface->locationY1) && (prev_surface.locationY2 <= new_surface->locationY2)) 
+                {
+                    randLocation(new_surface, width, height);
+                    break;
+                }
+                ++state;
+            }
+
+            if(state == my_count)
+            {
+                writeFile(new_surface);
+                ++my_count;
+                printf("New Surface: %d-%d-%d-%d\n", new_surface->locationX1, new_surface->locationY1, new_surface->locationX2, new_surface->locationY2);
+                break;
+            }
+        }
+    }
+    return 1;
+}
+
+static uint checkLocation = 1;
 static void configure_ilm_surface(t_ilm_uint id, t_ilm_uint width, t_ilm_uint height)
 {
-    ilm_surfaceSetDestinationRectangle(id, 0, 0, width, height);
-    ilm_surfaceSetSourceRectangle(id, 0, 0, width, height);
-    ilm_surfaceSetVisibility(id, ILM_TRUE);
-    ilm_layerAddSurface(layer,id);
-    ilm_surfaceRemoveNotification(id);
+    t_surface new_surface = {0};
+    printf("Start set location!\n");
+    checkLocation = getLocation(&new_surface, width, height);
+    printf("End set location!\n");
 
-    ilm_commitChanges();
-    pthread_cond_signal( &waiterVariable );
+    if(checkLocation)
+    {
+        ilm_surfaceSetDestinationRectangle(id, new_surface.locationX1, new_surface.locationY1, width, height);
+        ilm_surfaceSetSourceRectangle(id, 0, 0, width, height);
 
-    printf("layer-add-surfaces: surface (%u) configured with:\n"
-           "    dst region: x:0 y:0 w:%u h:%u\n"
-           "    src region: x:0 y:0 w:%u h:%u\n"
-           "    visibility: TRUE\n"
-           "    added to layer (%u)\n", id, width, height, width, height,layer);
+        printf("==> Layer: width: %d and height: %d\n", screenWidth, screenHeight);
+        printf("==> Surface: width: %d and height: %d\n", width, height);
+        printf("==> Position: X: %d & Y: %d\n", new_surface.locationX1, new_surface.locationY1);
+
+        ilm_surfaceSetVisibility(id, ILM_TRUE);
+        ilm_layerAddSurface(layer,id);
+        ilm_surfaceRemoveNotification(id);
+
+        ilm_commitChanges();
+        pthread_cond_signal(&waiterVariable);
+
+        printf("layer-add-surfaces: surface (%u) configured with:\n"
+            "    dst region: x:0 y:0 w:%u h:%u\n"
+            "    src region: x:0 y:0 w:%u h:%u\n"
+            "    visibility: TRUE\n"
+            "    added to layer (%u)\n", id, width, height, width, height,layer);
+    }
+    else
+    {
+        printf("No more space to render this surface!\n");
+    }
 }
 
 static void surfaceCallbackFunction(t_ilm_uint id, struct ilmSurfaceProperties* sp, t_ilm_notification_mask m)
 {
     if ((unsigned)m & ILM_NOTIFICATION_CONFIGURED)
     {
+        // printf("LOG\n");
         configure_ilm_surface(id, sp->origSourceWidth, sp->origSourceHeight);
     }
 }
@@ -73,17 +276,17 @@ static void callbackFunction(ilmObjectType object, t_ilm_uint id, t_ilm_bool cre
     if (object == ILM_SURFACE) {
         if (created) {
             if (number_of_surfaces > 0) {
-                number_of_surfaces--;
                 printf("layer-add-surfaces: surface (%d) created\n",id);
                 // always get configured event to follow the surface changings
                 ilm_surfaceAddNotification(id,&surfaceCallbackFunction);
                 ilm_commitChanges();
                 ilm_getPropertiesOfSurface(id, &sp);
+                if(checkLocation == 1) number_of_surfaces--;
 
-                if ((sp.origSourceWidth != 0) && (sp.origSourceHeight !=0))
-                {   // surface is already configured
-                    configure_ilm_surface(id, sp.origSourceWidth, sp.origSourceHeight);
-                }
+                // if ((sp.origSourceWidth != 0) && (sp.origSourceHeight !=0))
+                // {   // surface is already configured
+                //     configure_ilm_surface(id, sp.origSourceWidth, sp.origSourceHeight);
+                // }
             }
         }
         else if(!created)
@@ -254,6 +457,7 @@ int main (int argc, char *argv[])
         return -1;
     }
 
+    clearFile();
     pthread_mutexattr_destroy(&a);
 
     t_ilm_layer renderOrder[1];
