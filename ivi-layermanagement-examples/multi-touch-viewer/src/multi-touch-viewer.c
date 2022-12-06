@@ -587,15 +587,15 @@ setup_signal()
 
 /******************************************************************************/
 
-int
-touch_event_test_main(struct touch_event_test_params *p_params)
+static int
+touch_event_test_main(int argc, char **argv, struct touch_event_test_params *p_params)
 {
     struct WaylandDisplay   *p_display;
     struct WaylandEglWindow *p_window;
 
     setup_signal();
 
-    p_display = CreateDisplay(0, NULL);
+    p_display = CreateDisplay(argc, argv);
     if (NULL == p_display)
     {
         LOG_ERROR("Failed to create display\n");
@@ -646,35 +646,27 @@ usage(int status)
 {
     printf("usage: multi-touch-viewer [OPTION]\n");
     printf("  -p : print received touch point\n");
+    printf("  -s : surface type. s=1 for shell surface, s=2 for ivi surface\n");
+    printf("  -h : show this help and exit\n");
     exit(status);
 }
 
 int
 main(int argc, char **argv)
 {
-    _UNUSED_(argc);
-    _UNUSED_(argv);
-    struct touch_event_test_params params;
-
-    memset(&params, 0x00, sizeof params);
-
-    if (argc == 2)
-    {
-        if (0 == strcmp(argv[1], "-p"))
-        {
-            g_is_print_log = 1;
-        }
-        else
-        {
-            usage(EXIT_SUCCESS);
-        }
+    if(isOptionAvailable("-h", argc, argv)){
+        usage(EXIT_SUCCESS);
     }
 
+    struct touch_event_test_params params;
+    memset(&params, 0x00, sizeof params);
+
+    g_is_print_log = isOptionAvailable("-p", argc, argv) ? 1:0;
     gp_test_params = &params;
 
     wl_list_init(&params.touch_point_list);
 
     log_array_init(&params.log_array, 500);
 
-    return touch_event_test_main(&params);
+    return touch_event_test_main(argc, argv, &params);
 }

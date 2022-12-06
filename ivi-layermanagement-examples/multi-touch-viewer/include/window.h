@@ -27,6 +27,7 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include "ivi-application-client-protocol.h"
+#include <stdbool.h>
 
 #define _UNUSED_(arg) (void)arg;
 
@@ -46,6 +47,12 @@ struct Task
     struct wl_list link;
 };
 
+enum TypeOfSurface
+{
+    SHELL_SURFACE = 1,
+    IVI_SURFACE   = 2
+};
+
 struct WaylandDisplay
 {
     struct Task           display_task;
@@ -57,6 +64,7 @@ struct WaylandDisplay
     EGLDisplay            egldisplay;
     EGLConfig             eglconfig;
     EGLContext            eglcontext;
+    enum TypeOfSurface    surfaceType;
 
     int                   running;
     int                   epoll_fd;
@@ -136,5 +144,11 @@ DisplaySetUserData(struct WaylandDisplay *p_display, void *p_data);
 
 void
 WindowCreateSurface(struct WaylandEglWindow *p_window);
+
+bool
+isOptionAvailable(const char *p_option, int argc, char **argv);
+
+int  
+getIntArgument(const char *p_option, int argc, char **argv);
 
 #endif
