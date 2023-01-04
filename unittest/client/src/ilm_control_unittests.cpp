@@ -723,3 +723,60 @@ TEST_F(IlmControlTest, wm_listener_layer_surface_added_addNewOne)
     ASSERT_EQ(1, wl_array_add_fake.call_count);
     ASSERT_EQ(1, l_dataSurface);
 }
+
+TEST_F(IlmControlTest, wm_listener_surface_created_sameSurfaceId)
+{
+    // Invoke the wm_listener_surface_created with surface id exist, expect there isn't the ctx_layer created
+    wm_listener_surface_created(&ilm_context.wl, nullptr, 1);
+    // wl_list_insert should not trigger
+    ASSERT_EQ(0, wl_list_insert_fake.call_count);
+}
+
+TEST_F(IlmControlTest, wm_listener_surface_created_addNewOne)
+{
+    // Invoke the wm_listener_surface_created with exist surface id in list, expect there is a id add to list
+    wm_listener_surface_created(&ilm_context.wl, nullptr, MAX_NUMBER + 1);
+    // wl_list_insert should not trigger
+    ASSERT_EQ(1, wl_list_insert_fake.call_count);
+    // free resource
+    struct surface_context *lp_createSurface = (struct surface_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct surface_context, link));
+    free(lp_createSurface);
+
+    // Invoke the wm_listener_surface_created with new layer id and there is a callback notification, expect new ctx_layer created and callback is trigged
+    ilm_context.wl.notification = notificationCallback;
+    wm_listener_surface_created(&ilm_context.wl, nullptr, MAX_NUMBER + 1);
+    // The The wl_list_insert should trigger and callback is trigged
+    ASSERT_EQ(2, wl_list_insert_fake.call_count);
+    ASSERT_EQ(CREATE_SURFACE, g_ilmControlStatus);
+    // free resource
+    lp_createSurface = (struct surface_context*)(uintptr_t(wl_list_insert_fake.arg1_history[1]) - offsetof(struct surface_context, link));
+    free(lp_createSurface);
+}
+
+TEST_F(IlmControlTest, wm_listener_surface_destroyed_wrongSurfaceId)
+{
+    // Invoke the wm_listener_surface_destroyed with wrong surface id, expect there isn't surface will remove
+    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, MAX_NUMBER + 1);
+    // The wl_list_remove should not trigger
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+}
+
+TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Invoke to wm_listener_surface_destroyed with a surface id, expect there is a surface will remove
+    ilm_context.wl.notification = NULL;
+    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 1);
+    // wl_list_remove should trigger once time
+    ASSERT_EQ(1, wl_list_remove_fake.call_count);
+    mp_ctxLayer[0] = nullptr;
+
+    // Invoke the wm_listener_surface_destroyed with a callback register
+    ilm_context.wl.notification = notificationCallback;
+    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 2);
+    // The wl_list_remove should trigger and notification callback should called
+    ASSERT_EQ(2, wl_list_remove_fake.call_count);
+    ASSERT_EQ(DESTROY_SURFACE, g_ilmControlStatus);
+    mp_ctxLayer[1] = nullptr;
+}
