@@ -90,6 +90,37 @@ TEST_F(IlmCommonTest, ilm_init_getSuccess)
     ASSERT_EQ(ILM_SUCCESS, ilmControl_init_fake.return_val_history[0]);
 }
 
+TEST_F(IlmCommonTest, ilm_init_manyTimes)
+{
+    // Prepare fake for wl_display_connect and ilmControl_init, to make the ilm_init return success
+    mock_ilmInitSuccess();
+    // Invoke the ilm_init in first time and expect return ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, ilm_init());
+    // Invoke the ilm_init in second time and expect return ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, ilm_init());
+    // Invoke the ilm_destroy in first time and expect return ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
+    // Invoke the ilm_destroy in second time and expect return ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
+    // Invoke the ilm_destroy in third time and expect return ILM_SUCCESS
+    ASSERT_EQ(ILM_FAILED, ilm_destroy());
+}
+
+TEST_F(IlmCommonTest, ilm_initWithNativedisplay_existDisplay)
+{
+    // Prepare fake for wl_display_connect and ilmControl_init, to make the ilm_init return success
+    mock_ilmInitSuccess();
+    // Invoke the ilm_initWithNativedisplay with exist display and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, ilm_initWithNativedisplay(1));
+    /* Check the logic
+     * wl_display_connect will not be called
+     * ilmControl_init_fake should call one time and return ILM_SUCCESS
+     */
+    ASSERT_EQ(wl_display_connect_fake.call_count, 0);
+    ASSERT_EQ(ilmControl_init_fake.call_count, 1);
+    ASSERT_EQ(ILM_SUCCESS, ilmControl_init_fake.return_val_history[0]);
+}
+
 TEST_F(IlmCommonTest, ilm_isInitialized_getFalse)
 {
     // Don't call ilm_init
@@ -148,20 +179,4 @@ TEST_F(IlmCommonTest, ilm_destroy_getSuccess)
     ASSERT_EQ(ILM_SUCCESS, ilm_init());
     // Invoke the ilm_destroy and expect return ILM_SUCCESS
     ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
-}
-
-TEST_F(IlmCommonTest, ilm_init_manyTimes)
-{
-    // Prepare fake for wl_display_connect and ilmControl_init, to make the ilm_init return success
-    mock_ilmInitSuccess();
-    // Invoke the ilm_init in first time and expect return ILM_SUCCESS
-    ASSERT_EQ(ILM_SUCCESS, ilm_init());
-    // Invoke the ilm_init in second time and expect return ILM_SUCCESS
-    ASSERT_EQ(ILM_SUCCESS, ilm_init());
-    // Invoke the ilm_destroy in first time and expect return ILM_SUCCESS
-    ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
-    // Invoke the ilm_destroy in second time and expect return ILM_SUCCESS
-    ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
-    // Invoke the ilm_destroy in third time and expect return ILM_SUCCESS
-    ASSERT_EQ(ILM_FAILED, ilm_destroy());
 }

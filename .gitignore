@@ -3,3 +3,5 @@
 *patch
 *.pdf
 *build*
+*.sh
+.vscode

@@ -52,6 +52,8 @@ public:
             mp_ctxSurface[i]->id_surface = mp_ilmSurfaceIds[i];
             mp_ctxSurface[i]->ctx = &ilm_context.wl;
             mp_ctxSurface[i]->prop = mp_surfaceProps[i];
+            mp_ctxSurface[i]->notification = NULL;
+            custom_wl_list_init(&mp_ctxSurface[i]->list_accepted_seats);
             custom_wl_list_insert(&ilm_context.wl.list_surface, &mp_ctxSurface[i]->link);
             //prepare the layers
             mp_ctxLayer[i] = (struct layer_context*)malloc(sizeof(struct layer_context));
@@ -770,7 +772,7 @@ TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
     wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 1);
     // wl_list_remove should trigger once time
     ASSERT_EQ(1, wl_list_remove_fake.call_count);
-    mp_ctxLayer[0] = nullptr;
+    mp_ctxSurface[0] = nullptr;
 
     // Invoke the wm_listener_surface_destroyed with a callback register
     ilm_context.wl.notification = notificationCallback;
@@ -778,5 +780,5 @@ TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
     // The wl_list_remove should trigger and notification callback should called
     ASSERT_EQ(2, wl_list_remove_fake.call_count);
     ASSERT_EQ(DESTROY_SURFACE, g_ilmControlStatus);
-    mp_ctxLayer[1] = nullptr;
+    mp_ctxSurface[1] = nullptr;
 }
