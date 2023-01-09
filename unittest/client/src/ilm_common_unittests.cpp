@@ -180,3 +180,152 @@ TEST_F(IlmCommonTest, ilm_destroy_getSuccess)
     // Invoke the ilm_destroy and expect return ILM_SUCCESS
     ASSERT_EQ(ILM_SUCCESS, ilm_destroy());
 }
+
+TEST_F(IlmCommonTest, wayland_init_cannotGetDisplay)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Prepare fake for wl_display_connect, to make the result is nullptr
+    mpp_wlDisplays[0] = nullptr;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_FAILED
+    ASSERT_EQ(ILM_FAILED, gIlmCommonPlatformFunc.init(0));
+    /* Check the logic
+     * wl_display_connect should call one time
+     */
+    ASSERT_EQ(wl_display_connect_fake.call_count, 1);
+    ASSERT_EQ(wl_display_connect_fake.return_val_history[0], nullptr);
+}
+
+TEST_F(IlmCommonTest, wayland_init_existDisplay)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(1));
+    /* Check the logic
+     * wl_display_connect should not be called
+     */
+    ASSERT_EQ(wl_display_connect_fake.call_count, 0);
+}
+
+TEST_F(IlmCommonTest, wayland_init_getSuccess)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Prepare fake for wl_display_connect, to make the result is success
+    mpp_wlDisplays[0] = (struct wl_display*)&m_wlDisplayFakePointer;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(0));
+    /* Check the logic
+     * wl_display_connect should call one time
+     */
+    ASSERT_EQ(wl_display_connect_fake.call_count, 1);
+    ASSERT_EQ(wl_display_connect_fake.return_val_history[0], mpp_wlDisplays[0]);
+}
+
+TEST_F(IlmCommonTest, wayland_getNativedisplay_getValue)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+
+    // Prepare fake for wl_display_connect, to make the result is nullptr
+    mpp_wlDisplays[0] = nullptr;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_FAILED
+    ASSERT_EQ(ILM_FAILED, gIlmCommonPlatformFunc.init(0));
+    // Invoke the wayland_getNativedisplay and expect the return is null (0)
+    ASSERT_EQ(0, gIlmCommonPlatformFunc.getNativedisplay());
+
+    // Prepare fake for wl_display_connect, to make the result is success
+    mpp_wlDisplays[0] = (struct wl_display*)&m_wlDisplayFakePointer;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(0));
+    // Invoke the wayland_getNativedisplay and expect the return is mpp_wlDisplays
+    ASSERT_EQ(mpp_wlDisplays[0], gIlmCommonPlatformFunc.getNativedisplay());
+    
+    // Invoke the wayland_init with exist display and expect the result is this display
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(1));
+    ASSERT_EQ(1, gIlmCommonPlatformFunc.getNativedisplay());
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(2));
+    ASSERT_EQ(2, gIlmCommonPlatformFunc.getNativedisplay());
+}
+
+TEST_F(IlmCommonTest, wayland_isInitialized_getFalse)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Prepare fake for wl_display_connect, to make the result is nullptr
+    mpp_wlDisplays[0] = nullptr;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_FAILED
+    ASSERT_EQ(ILM_FAILED, gIlmCommonPlatformFunc.init(0));
+    // Invoke the wayland_isInitialized and expect the return is false
+    ASSERT_EQ(0, gIlmCommonPlatformFunc.isInitialized());
+}
+
+TEST_F(IlmCommonTest, wayland_isInitialized_getTrue)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(1));
+    // Invoke the wayland_isInitialized and expect the return is true
+    ASSERT_EQ(1, gIlmCommonPlatformFunc.isInitialized());
+}
+
+TEST_F(IlmCommonTest, wayland_destroy_cannotGetDisplay)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Prepare fake for wl_display_connect, to make the result is nullptr
+    mpp_wlDisplays[0] = nullptr;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_FAILED
+    ASSERT_EQ(ILM_FAILED, gIlmCommonPlatformFunc.init(0));
+    // Invoke the wayland_destroy and expect the return is false
+    ASSERT_EQ(ILM_FAILED, gIlmCommonPlatformFunc.destroy());
+    /* Check the logic
+     * wl_display_roundtrip should not be called
+     * wl_display_disconnect should not be called
+     */
+    ASSERT_EQ(wl_display_roundtrip_fake.call_count, 0);
+    ASSERT_EQ(wl_display_disconnect_fake.call_count, 0);
+}
+
+TEST_F(IlmCommonTest, wayland_destroy_existDisplay)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(1));
+    // Invoke the wayland_destroy and expect the return is true
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.destroy());
+    /* Check the logic
+     * wl_display_roundtrip should not be called
+     * wl_display_disconnect should not be called
+     */
+    ASSERT_EQ(wl_display_roundtrip_fake.call_count, 0);
+    ASSERT_EQ(wl_display_disconnect_fake.call_count, 0);
+}
+
+TEST_F(IlmCommonTest, wayland_destroy_getSuccess)
+{
+    // Get address functions to gIlmCommonPlatformFunc
+    init_ilmCommonPlatformTable();
+    // Prepare fake for wl_display_connect, to make the result is success
+    mpp_wlDisplays[0] = (struct wl_display*)&m_wlDisplayFakePointer;
+    SET_RETURN_SEQ(wl_display_connect, mpp_wlDisplays, MAX_NUMBER);
+    // Invoke the wayland_init and expect the resutl is ILM_SUCCESS
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.init(0));
+    // Invoke the wayland_destroy and expect the return is true
+    ASSERT_EQ(ILM_SUCCESS, gIlmCommonPlatformFunc.destroy());
+    /* Check the logic
+     * wl_display_roundtrip should call one time
+     * wl_display_disconnect should call one time
+     */
+    ASSERT_EQ(wl_display_roundtrip_fake.call_count, 1);
+    ASSERT_EQ(wl_display_disconnect_fake.call_count, 1);    
+}
