@@ -38,6 +38,10 @@ LINK_DIRECTORIES(
     ${WAYLAND_CLIENT_LIBRARY_DIRS}
 )
 
+FILE(GLOB ILM_COMMON_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../ivi-layermanagement-api/ilmCommon/src/*.c)
+FILE(GLOB ILM_CONTROL_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../ivi-layermanagement-api/ilmControl/src/*.c)
+FILE(GLOB ILM_INPUT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../ivi-layermanagement-api/ilmInput/src/*.c)
+
 SET(LIBS
     ilmCommon
     ilmControl
@@ -64,21 +68,24 @@ SET(SRC_IVI_INPUT_FILES
 )
 
 
-SET(GCC_SANITIZER_COMPILE_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector-all -fpermissive")
-SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread" )
-SET( CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan" )
+include(CodeCoverage.cmake)
+append_coverage_compiler_flags()
 
-ADD_EXECUTABLE(test_ilm_client_common ${SRC_COMMON_FILES} ${SRC_IVI_COMMON_FILES})
+SET(GCC_SANITIZER_COMPILE_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector-all -fpermissive")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread -g -O0 -fprofile-arcs -ftest-coverage")
+SET(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan -g -O0 -fprofile-arcs -ftest-coverage")
+
+ADD_EXECUTABLE(test_ilm_client_common ${SRC_COMMON_FILES} ${SRC_IVI_COMMON_FILES} ${ILM_COMMON_SRC})
 TARGET_LINK_LIBRARIES(test_ilm_client_common ${LIBS})
 ADD_DEPENDENCIES(test_ilm_client_common ${LIBS})
 INSTALL(TARGETS test_ilm_client_common DESTINATION bin/tests)
 
-ADD_EXECUTABLE(test_ilm_client_input ${SRC_COMMON_FILES} ${SRC_IVI_INPUT_FILES})
+ADD_EXECUTABLE(test_ilm_client_input ${SRC_COMMON_FILES} ${SRC_IVI_INPUT_FILES} ${ILM_INPUT_SRC})
 TARGET_LINK_LIBRARIES(test_ilm_client_input ${LIBS})
 ADD_DEPENDENCIES(test_ilm_client_input ${LIBS})
 INSTALL(TARGETS test_ilm_client_input DESTINATION bin/tests)
 
-ADD_EXECUTABLE(test_ilm_client_control ${SRC_COMMON_FILES} ${SRC_IVI_CONTROL_FILES})
+ADD_EXECUTABLE(test_ilm_client_control ${SRC_COMMON_FILES} ${SRC_IVI_CONTROL_FILES} ${ILM_CONTROL_SRC})
 TARGET_LINK_LIBRARIES(test_ilm_client_control ${LIBS})
 ADD_DEPENDENCIES(test_ilm_client_control ${LIBS})
 INSTALL(TARGETS test_ilm_client_control DESTINATION bin/tests)

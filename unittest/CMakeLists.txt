@@ -19,7 +19,7 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
-FIND_PACKAGE(gtest)
+find_package(gtest REQUIRED)
 
 IF(NOT gtest_FOUND)
     MESSAGE(STATUS "gtest not found, disabling unit tests (BUILD_ILM_UNIT_TESTS=OFF)")
