@@ -1469,7 +1469,7 @@ TEST_F(IlmControlTest, wm_listener_layer_destroyed_removeOne)
 {
     // Prepare fake for wl_list_remove, to remove real object
     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
-    // Invoke to wm_listener_layer_destroyed with 
+    // Invoke to wm_listener_layer_destroyed with valid layer
     wm_listener_layer_destroyed(&ilm_context.wl, nullptr, 100);
     // wl_list_remove should trigger once time
     ASSERT_EQ(1, wl_list_remove_fake.call_count);
@@ -1860,9 +1860,9 @@ TEST_F(IlmControlTest, wm_screen_listener_error_success)
     wm_screen_listener_error(mp_ctxScreen[0], nullptr, 3, "");
 }
 
-TEST_F(IlmControlTest, input_listener_seat_created_invalidSeat)
+TEST_F(IlmControlTest, input_listener_seat_created_validSeat)
 {
-    // Invoke the input_listener_seat_created with invalid a seat
+    // Invoke the input_listener_seat_created with valid a seat
     input_listener_seat_created(&ilm_context.wl, nullptr, "TOUCH", 0);
     // Expect the wl_list_insert should not trigger
     ASSERT_EQ(0, wl_list_insert_fake.call_count);
@@ -1874,4 +1874,73 @@ TEST_F(IlmControlTest, input_listener_seat_created_newOne)
     input_listener_seat_created(&ilm_context.wl, nullptr, "", 0);
     // Expect the wl_list_insert should trigger
     ASSERT_EQ(1, wl_list_insert_fake.call_count);
+    // Free resource
+    struct seat_context *lp_createSeat = (struct seat_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct seat_context, link));
+    free(lp_createSeat->seat_name);
+    free(lp_createSeat);
+}
+
+TEST_F(IlmControlTest, input_listener_seat_capabilities_invalidSeat)
+{
+    // Invoke the input_listener_seat_capabilities with a new seat
+    input_listener_seat_capabilities(&ilm_context.wl, nullptr, "", 0);
+}
+
+TEST_F(IlmControlTest, input_listener_seat_capabilities_success)
+{
+    // Invoke the input_listener_seat_capabilities with valid seat
+    input_listener_seat_capabilities(&ilm_context.wl, nullptr, "TOUCH", 0);
+}
+
+TEST_F(IlmControlTest, input_listener_seat_destroyed_invalidSeat)
+{
+    // Invoke the input_listener_seat_destroyed with invalid seat
+    input_listener_seat_destroyed(&ilm_context.wl, nullptr, "");
+    // Expect the wl_list_remove should not trigger
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+}
+
+// TEST_F(IlmControlTest, input_listener_seat_destroyed_success)
+// {
+//     // Prepare fake for wl_list_remove, to remove real object
+//     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+//     // Invoke the input_listener_seat_destroyed with valid a seat
+//     input_listener_seat_destroyed(&ilm_context.wl, nullptr, "KEYBOARD");
+//     // Expect the wl_list_remove should trigger
+//     ASSERT_EQ(1, wl_list_remove_fake.call_count);
+//     mp_ctxSeat[0]->seat_name = nullptr;
+//     mp_ctxSeat[0] = nullptr;
+// }
+
+TEST_F(IlmControlTest, input_listener_input_focus_invalidSurface)
+{
+    // Invoke the input_listener_input_focus with valid surface_id
+    uint32_t surface_id = 6;
+    int32_t enabled = 0;
+    input_listener_input_focus(&ilm_context.wl, nullptr, surface_id, 0, enabled);
+}
+
+TEST_F(IlmControlTest, input_listener_input_focus_unenabled)
+{
+    // Invoke the input_listener_input_focus with valid surface_id
+    uint32_t surface_id = 1;
+    int32_t enabled = 0;
+    input_listener_input_focus(&ilm_context.wl, nullptr, surface_id, 0, enabled);
+}
+
+TEST_F(IlmControlTest, input_listener_input_focus_enabled)
+{
+    // Invoke the input_listener_input_focus with valid surface_id
+    uint32_t surface_id = 1;
+    int32_t enabled = 1;
+    input_listener_input_focus(&ilm_context.wl, nullptr, surface_id, 0, enabled);
+}
+
+TEST_F(IlmControlTest, input_listener_input_acceptance_invalidSurface)
+{
+    // Invoke the input_listener_input_acceptance with invalid surface_id
+    uint32_t surface_id = 6;
+    int32_t accepted = 1;
+    input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "", accepted);
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
 }
