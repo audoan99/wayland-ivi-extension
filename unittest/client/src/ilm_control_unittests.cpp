@@ -7,6 +7,7 @@
 #include "ivi-wm-client-protocol.h"
 
 extern "C"{
+    ILM_EXPORT ilmErrorTypes ilmControl_init(t_ilm_nativedisplay);
     extern struct ilm_control_context ilm_context;
 }
 static constexpr uint8_t MAX_NUMBER = 5;
@@ -25,10 +26,10 @@ static t_ilm_notification_mask g_ilm_notification_mask;
 
 static void notificationCallback(ilmObjectType object, t_ilm_uint id, t_ilm_bool created, void *user_data)
 {
-    if (object == ILM_SURFACE) 
+    if (object == ILM_SURFACE)
     {
         g_ilmControlStatus = created ? CREATE_SURFACE : DESTROY_SURFACE;
-    } else if (object == ILM_LAYER) 
+    } else if (object == ILM_LAYER)
     {
         g_ilmControlStatus = created ? CREATE_LAYER : DESTROY_LAYER;
     }
@@ -74,7 +75,7 @@ public:
         {
             // prepare the seats
             mp_ctxSeat[i] = (struct seat_context*)malloc(sizeof(struct seat_context));
-            mp_ctxSeat[i]->seat_name = mp_ilmSeatNames[i];
+            mp_ctxSeat[i]->seat_name = strdup(mp_ilmSeatNames[i]);
             mp_ctxSeat[i]->capabilities = 1;
             custom_wl_list_insert(&ilm_context.wl.list_seat, &mp_ctxSeat[i]->link);
         }
@@ -93,11 +94,13 @@ public:
             mp_ctxLayer[i]->id_layer = mp_ilmLayerIds[i];
             mp_ctxLayer[i]->ctx = &ilm_context.wl;
             mp_ctxLayer[i]->prop = mp_layerProps[i];
+            mp_ctxLayer[i]->notification = NULL;
             custom_wl_list_insert(&ilm_context.wl.list_layer, &mp_ctxLayer[i]->link);
             custom_wl_array_init(&mp_ctxLayer[i]->render_order);
             // prepare the screens
             mp_ctxScreen[i] = (struct screen_context*)malloc(sizeof(struct screen_context));
             mp_ctxScreen[i]->id_screen = mp_ilmScreenIds[i];
+            mp_ctxScreen[i]->name = i;
             mp_ctxScreen[i]->ctx = &ilm_context.wl;
             mp_ctxScreen[i]->prop = mp_screenProps[i];
             custom_wl_list_insert(&ilm_context.wl.list_screen, &mp_ctxScreen[i]->link);
@@ -109,28 +112,28 @@ public:
     {
         {
             struct seat_context *l, *n;
-            wl_list_for_each_safe(l, n, &ilm_context.wl.list_seat, link) 
+            wl_list_for_each_safe(l, n, &ilm_context.wl.list_seat, link)
             {
                 custom_wl_list_remove(&l->link);
             }
         }
         {
             struct surface_context *l, *n;
-            wl_list_for_each_safe(l, n, &ilm_context.wl.list_surface, link) 
+            wl_list_for_each_safe(l, n, &ilm_context.wl.list_surface, link)
             {
                 custom_wl_list_remove(&l->link);
             }
         }
         {
             struct layer_context *l, *n;
-            wl_list_for_each_safe(l, n, &ilm_context.wl.list_layer, link) 
+            wl_list_for_each_safe(l, n, &ilm_context.wl.list_layer, link)
             {
                 custom_wl_list_remove(&l->link);
             }
         }
         {
             struct screen_context *l, *n;
-            wl_list_for_each_safe(l, n, &ilm_context.wl.list_screen, link) 
+            wl_list_for_each_safe(l, n, &ilm_context.wl.list_screen, link)
             {
                 custom_wl_list_remove(&l->link);
             }
@@ -139,6 +142,7 @@ public:
         {
             if(mp_ctxSeat[i] != nullptr)
             {
+                free(mp_ctxSeat[i]->seat_name);
                 free(mp_ctxSeat[i]);
             }
         }
@@ -764,9 +768,14 @@ TEST_F(IlmControlTest, ilm_layerSetVisibility_wrongCtx)
 {
     // Prepare fake for ilm_layerSetVisibility, set controller is nullptr
     ilm_context.wl.controller = nullptr;
-    // Invoke the ilm_layerSetVisibility with valid layerId, expect return failure
+
+    // Invoke the ilm_layerSetVisibility with newVisibility set false, expect return failure
     t_ilm_layer l_layerId = 100;
-    t_ilm_bool newVisibility = ILM_TRUE;
+    t_ilm_bool newVisibility = ILM_FALSE;
+    ASSERT_EQ(ILM_FAILED, ilm_layerSetVisibility(l_layerId, newVisibility));
+
+    // Invoke the ilm_layerSetVisibility with valid layerId, expect return failure
+    newVisibility = ILM_TRUE;
     ASSERT_EQ(ILM_FAILED, ilm_layerSetVisibility(l_layerId, newVisibility));
     // The wl_proxy_marshal_flags and wl_display_roundtrip_queue should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
@@ -845,7 +854,7 @@ TEST_F(IlmControlTest, ilm_layerSetOpacity_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_layerSetOpacity(l_layerId, opacity));
     // The wl_proxy_marshal_flags and wl_display_roundtrip_queue should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetOpacity_success)
@@ -857,7 +866,7 @@ TEST_F(IlmControlTest, ilm_layerSetOpacity_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_layerSetOpacity(l_layerId, opacity));
     // The wl_proxy_marshal_flags and wl_display_roundtrip_queue should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerGetOpacity_wrongVisibility)
@@ -919,7 +928,7 @@ TEST_F(IlmControlTest, ilm_layerSetSourceRectangle_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_layerSetSourceRectangle(l_layerId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetSourceRectangle_success)
@@ -930,7 +939,7 @@ TEST_F(IlmControlTest, ilm_layerSetSourceRectangle_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_layerSetSourceRectangle(l_layerId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetDestinationRectangle_wrongCtx)
@@ -942,7 +951,7 @@ TEST_F(IlmControlTest, ilm_layerSetDestinationRectangle_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_layerSetDestinationRectangle(l_layerId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetDestinationRectangle_success)
@@ -953,7 +962,7 @@ TEST_F(IlmControlTest, ilm_layerSetDestinationRectangle_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_layerSetDestinationRectangle(l_layerId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetRenderOrder_wrongCtx)
@@ -966,7 +975,7 @@ TEST_F(IlmControlTest, ilm_layerSetRenderOrder_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_layerSetRenderOrder(l_layerId, mp_ilmSurfaceIds, number));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_layerSetRenderOrder_success)
@@ -978,16 +987,21 @@ TEST_F(IlmControlTest, ilm_layerSetRenderOrder_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_layerSetRenderOrder(l_layerId, mp_ilmSurfaceIds, number));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1 + number, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetVisibility_wrongCtx)
 {
     // Prepare fake for ilm_surfaceSetVisibility, set controller is nullptr
     ilm_context.wl.controller = nullptr;
-    // Invoke the ilm_surfaceSetVisibility with valid surface id, expect return failure
+
+    // Invoke the ilm_surfaceSetVisibility with newVisibility set false, expect return failure
     t_ilm_surface surfaceId = 1;
-    t_ilm_bool newVisibility = ILM_TRUE;
+    t_ilm_bool newVisibility = ILM_FALSE;
+    ASSERT_EQ(ILM_FAILED, ilm_surfaceSetVisibility(surfaceId, newVisibility));
+
+    // Invoke the ilm_surfaceSetVisibility with valid surface id, expect return failure
+    newVisibility = ILM_TRUE;
     ASSERT_EQ(ILM_FAILED, ilm_surfaceSetVisibility(surfaceId, newVisibility));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
@@ -1141,7 +1155,7 @@ TEST_F(IlmControlTest, ilm_surfaceSetSourceRectangle_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_surfaceSetSourceRectangle(surfaceId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetSourceRectangle_success)
@@ -1152,7 +1166,7 @@ TEST_F(IlmControlTest, ilm_surfaceSetSourceRectangle_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetSourceRectangle(surfaceId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetDestinationRectangle_wrongCtx)
@@ -1164,7 +1178,7 @@ TEST_F(IlmControlTest, ilm_surfaceSetDestinationRectangle_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_surfaceSetDestinationRectangle(surfaceId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetDestinationRectangle_success)
@@ -1175,7 +1189,7 @@ TEST_F(IlmControlTest, ilm_surfaceSetDestinationRectangle_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetDestinationRectangle(surfaceId, 0, 0, 640, 480));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetType_wrongType)
@@ -1186,7 +1200,7 @@ TEST_F(IlmControlTest, ilm_surfaceSetType_wrongType)
     ASSERT_EQ(ILM_ERROR_INVALID_ARGUMENTS, ilm_surfaceSetType(surfaceId, type));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetType_wrongCtx)
@@ -1195,22 +1209,27 @@ TEST_F(IlmControlTest, ilm_surfaceSetType_wrongCtx)
     ilm_context.wl.controller = nullptr;
     // Invoke the ilm_surfaceSetType with valid type, expect return failure
     t_ilm_surface surfaceId = 1;
-    ilmSurfaceType type = ILM_SURFACETYPE_RESTRICTED;
-    ASSERT_EQ(ILM_FAILED, ilm_surfaceSetType(surfaceId, type));
+    ASSERT_EQ(ILM_FAILED, ilm_surfaceSetType(surfaceId, ILM_SURFACETYPE_RESTRICTED));
+    ASSERT_EQ(ILM_FAILED, ilm_surfaceSetType(surfaceId, ILM_SURFACETYPE_DESKTOP));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_surfaceSetType_success)
 {
     // Invoke the ilm_surfaceSetType with valid type and ctx controller, expect return success
     t_ilm_surface surfaceId = 1;
-    ilmSurfaceType type = ILM_SURFACETYPE_RESTRICTED;
-    ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetType(surfaceId, type));
+    ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetType(surfaceId, ILM_SURFACETYPE_RESTRICTED));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(1, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(1, wl_display_flush_fake.call_count);
+
+    // Invoke the ilm_surfaceSetType with valid type and ctx controller, expect return success
+    ASSERT_EQ(ILM_SUCCESS, ilm_surfaceSetType(surfaceId, ILM_SURFACETYPE_DESKTOP));
+    // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
+    ASSERT_EQ(2, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(2, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_displaySetRenderOrder_wrongCtx)
@@ -1223,7 +1242,7 @@ TEST_F(IlmControlTest, ilm_displaySetRenderOrder_wrongCtx)
     ASSERT_EQ(ILM_FAILED, ilm_displaySetRenderOrder(displayId, mp_ilmLayerIds, number));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_displaySetRenderOrder_invalidDisplayId)
@@ -1234,7 +1253,7 @@ TEST_F(IlmControlTest, ilm_displaySetRenderOrder_invalidDisplayId)
     ASSERT_EQ(ILM_FAILED, ilm_displaySetRenderOrder(displayId, mp_ilmLayerIds, number));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should not trigger
     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(0, wl_display_flush_fake.call_count);   
+    ASSERT_EQ(0, wl_display_flush_fake.call_count);
 }
 
 TEST_F(IlmControlTest, ilm_displaySetRenderOrder_success)
@@ -1305,29 +1324,33 @@ TEST_F(IlmControlTest, ilm_layerRemoveNotification_success)
     ilm_context.initialized = true;
     // Invoke the ilm_layerAddNotification with valid layerId, expect return success
     t_ilm_layer layerId = 100;
+    ASSERT_EQ(ILM_SUCCESS, ilm_layerAddNotification(layerId, &layerCallbackFunction));
     ASSERT_EQ(ILM_SUCCESS, ilm_layerRemoveNotification(layerId));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
-    ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
-    ASSERT_EQ(2, wl_display_roundtrip_queue_fake.call_count);
+    ASSERT_EQ(2, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(4, wl_display_roundtrip_queue_fake.call_count);
 }
 
-// TEST_F(IlmControlTest, ilm_surfaceAddNotification_addNewSurface)
-// {
-//     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
-//     ilm_context.initialized = true;
-//     // Invoke the ilm_surfaceAddNotification with valid layerId, expect return success
-//     t_ilm_surface surface = 6;
-//     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface, &surfaceCallbackFunction));
-//     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
-//     ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
-//     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
-// }
+TEST_F(IlmControlTest, ilm_surfaceAddNotification_addNewSurface)
+{
+    // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
+    ilm_context.initialized = true;
+    // Invoke the ilm_surfaceAddNotification with invalid surfaceId, expect return success
+    t_ilm_surface surface = 6;
+    ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface, &surfaceCallbackFunction));
+    // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
+    ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);\
+    // Free resource
+    struct surface_context *lp_createSurface = (struct surface_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct surface_context, link));
+    free(lp_createSurface);
+}
 
 TEST_F(IlmControlTest, ilm_surfaceAddNotification_noAddNewSurface)
 {
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
-    // Invoke the ilm_surfaceAddNotification with valid layerId, expect return failure
+    // Invoke the ilm_surfaceAddNotification with invalid surfaceId, expect return failure
     t_ilm_surface surface = 6;
     ASSERT_EQ(ILM_ERROR_INVALID_ARGUMENTS, ilm_surfaceAddNotification(surface, nullptr));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
@@ -1339,7 +1362,7 @@ TEST_F(IlmControlTest, ilm_surfaceAddNotification_nullNotification)
 {
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
-    // Invoke the ilm_surfaceAddNotification with valid layerId, expect return success
+    // Invoke the ilm_surfaceAddNotification with valid surfaceId, expect return success
     t_ilm_surface surface = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface, nullptr));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
@@ -1351,7 +1374,7 @@ TEST_F(IlmControlTest, ilm_surfaceAddNotification_success)
 {
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
-    // Invoke the ilm_surfaceAddNotification with valid layerId, expect return success
+    // Invoke the ilm_surfaceAddNotification with valid surfaceId, expect return success
     t_ilm_surface surface = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface, &surfaceCallbackFunction));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
@@ -1363,7 +1386,7 @@ TEST_F(IlmControlTest, ilm_surfaceRemoveNotification_nullNotification)
 {
     // Prepare fake for ilm_surfaceRemoveNotification, to ilm context is initilized
     ilm_context.initialized = true;
-    // Invoke the ilm_surfaceAddNotification with valid layerId, expect return failure
+    // Invoke the ilm_surfaceAddNotification with valid surfaceId, expect return failure
     t_ilm_surface surface = 1;
     ASSERT_EQ(ILM_ERROR_INVALID_ARGUMENTS, ilm_surfaceRemoveNotification(surface));
     // The wl_proxy_marshal_flags and wl_display_flush_fake should trigger
@@ -1412,16 +1435,44 @@ TEST_F(IlmControlTest, ilm_unregisterNotification_success)
     ASSERT_EQ(ILM_SUCCESS, ilm_unregisterNotification());
 }
 
+TEST_F(IlmControlTest, ilm_commitChanges_cannotGetRoundTripQueue)
+{
+    // invoke the ilm_commitChanges
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
+    ASSERT_EQ(ILM_FAILED, ilm_commitChanges());
+    ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
+    ASSERT_EQ(mp_failureResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
+
+    // invoke the ilm_commitChanges
+    ilm_context.wl.controller = nullptr;
+    ASSERT_EQ(ILM_FAILED, ilm_commitChanges());
+}
+
+TEST_F(IlmControlTest, ilm_commitChanges_success)
+{
+    // invoke the ilm_commitChanges
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
+    ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
+    ASSERT_EQ(mp_successResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
+}
+
 TEST_F(IlmControlTest, ilm_getError_cannotGetRoundTripQueue)
 {
+    // invoke the ilm_getError
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
     ASSERT_EQ(ILM_FAILED, ilm_getError());
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
     ASSERT_EQ(mp_failureResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
+
+    // invoke the ilm_getError
+    ilm_context.wl.controller = nullptr;
+    ASSERT_EQ(ILM_FAILED, ilm_getError());
 }
 
 TEST_F(IlmControlTest, ilm_getError_success)
 {
+    // invoke the ilm_getError
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
     ASSERT_EQ(ILM_SUCCESS, ilm_getError());
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
@@ -1553,13 +1604,25 @@ TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
     ASSERT_EQ(1, wl_list_remove_fake.call_count);
     mp_ctxSurface[0] = nullptr;
 
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
+    ilm_context.initialized = true;
+    // Invoke to wm_listener_surface_destroyed with a surface id, expect there is a surface will remove
+    ilm_context.wl.notification = NULL;
+    ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(2, &surfaceCallbackFunction));
+    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 2);
+    // wl_list_remove should trigger once time
+    ASSERT_EQ(2, wl_list_remove_fake.call_count);
+    mp_ctxSurface[1] = nullptr;
+
     // Invoke the wm_listener_surface_destroyed with a callback register
     ilm_context.wl.notification = notificationCallback;
-    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 2);
+    wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 3);
     // The wl_list_remove should trigger and notification callback should called
-    ASSERT_EQ(2, wl_list_remove_fake.call_count);
+    ASSERT_EQ(3, wl_list_remove_fake.call_count);
     ASSERT_EQ(DESTROY_SURFACE, g_ilmControlStatus);
-    mp_ctxSurface[1] = nullptr;
+    mp_ctxSurface[2] = nullptr;
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_visibility_invalidSurface)
@@ -1568,7 +1631,7 @@ TEST_F(IlmControlTest, wm_listener_surface_visibility_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_visibility(&ilm_context.wl, nullptr, surface_id, 0.5);
     // The wm_listener_surface_visibility should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x40, g_ilm_notification_mask);
+    ASSERT_EQ(0x80, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_visibility_success)
@@ -1576,22 +1639,27 @@ TEST_F(IlmControlTest, wm_listener_surface_visibility_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with surfaceCallbackFunction
-    // Invoke the wm_listener_surface_visibility with valid surface 
+    // Invoke the wm_listener_surface_visibility with valid surface
     uint32_t surface_id = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface_id, &surfaceCallbackFunction));
     wm_listener_surface_visibility(&ilm_context.wl, nullptr, surface_id, 1);
     wm_listener_surface_visibility(&ilm_context.wl, nullptr, surface_id, 0.5);
     // The wm_listener_surface_visibility should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_VISIBILITY
     ASSERT_EQ(ILM_NOTIFICATION_VISIBILITY, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_surface_visibility with null notification
+    surface_id = 5;
+    wm_listener_surface_visibility(&ilm_context.wl, nullptr, surface_id, 0.5);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_visibility_invalidLayer)
 {
     // Invoke the wm_listener_layer_visibility with invalid layer and not callback func
     uint32_t layer_id = 1;
+    ilm_context.wl.controller = nullptr;
     wm_listener_layer_visibility(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_visibility should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x02, g_ilm_notification_mask);  
+    ASSERT_EQ(0x02, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_visibility_success)
@@ -1599,13 +1667,17 @@ TEST_F(IlmControlTest, wm_listener_layer_visibility_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with layerCallbackFunction
-    // Invoke the wm_listener_layer_visibility with valid layer 
+    // Invoke the wm_listener_layer_visibility with valid layer
     uint32_t layer_id = 100;
     ASSERT_EQ(ILM_SUCCESS, ilm_layerAddNotification(layer_id, &layerCallbackFunction));
     wm_listener_layer_visibility(&ilm_context.wl, nullptr, layer_id, 1);
     wm_listener_layer_visibility(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_visibility should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_VISIBILITY
-    ASSERT_EQ(ILM_NOTIFICATION_VISIBILITY, g_ilm_notification_mask);    
+    ASSERT_EQ(ILM_NOTIFICATION_VISIBILITY, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_layer_visibility with notification = null
+    layer_id = 500;
+    wm_listener_layer_visibility(&ilm_context.wl, nullptr, layer_id, 0.5);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_opacity_invalidSurface)
@@ -1622,13 +1694,17 @@ TEST_F(IlmControlTest, wm_listener_surface_opacity_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with surfaceCallbackFunction
-    // Invoke the wm_listener_surface_opacity with valid surface 
+    // Invoke the wm_listener_surface_opacity with valid surface
     uint32_t surface_id = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface_id, &surfaceCallbackFunction));
     wm_listener_surface_opacity(&ilm_context.wl, nullptr, surface_id, 0);
     wm_listener_surface_opacity(&ilm_context.wl, nullptr, surface_id, 0.5);
     // The wm_listener_surface_opacity should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_OPACITY
-    ASSERT_EQ(ILM_NOTIFICATION_OPACITY, g_ilm_notification_mask);  
+    ASSERT_EQ(ILM_NOTIFICATION_OPACITY, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_surface_opacity with notification = null
+    surface_id = 5;
+    wm_listener_surface_opacity(&ilm_context.wl, nullptr, surface_id, 0.5);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_opacity_invalidLayer)
@@ -1637,7 +1713,7 @@ TEST_F(IlmControlTest, wm_listener_layer_opacity_invalidLayer)
     uint32_t layer_id = 1;
     wm_listener_layer_opacity(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_opacity should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x04, g_ilm_notification_mask);  
+    ASSERT_EQ(0x04, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_opacity_success)
@@ -1645,13 +1721,17 @@ TEST_F(IlmControlTest, wm_listener_layer_opacity_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with layerCallbackFunction
-    // Invoke the wm_listener_layer_opacity with valid layer 
+    // Invoke the wm_listener_layer_opacity with valid layer
     uint32_t layer_id = 100;
     ASSERT_EQ(ILM_SUCCESS, ilm_layerAddNotification(layer_id, &layerCallbackFunction));
     wm_listener_layer_opacity(&ilm_context.wl, nullptr, layer_id, 0);
     wm_listener_layer_opacity(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_opacity should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_OPACITY
-    ASSERT_EQ(ILM_NOTIFICATION_OPACITY, g_ilm_notification_mask);    
+    ASSERT_EQ(ILM_NOTIFICATION_OPACITY, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_layer_opacity with notification = null
+    layer_id = 500;
+    wm_listener_layer_opacity(&ilm_context.wl, nullptr, layer_id, 0.5);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_source_rectangle_invalidSurface)
@@ -1668,22 +1748,30 @@ TEST_F(IlmControlTest, wm_listener_surface_source_rectangle_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with surfaceCallbackFunction
-    // Invoke the wm_listener_surface_source_rectangle with valid surface 
+    // Invoke the wm_listener_surface_source_rectangle with valid surface
     uint32_t surface_id = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface_id, &surfaceCallbackFunction));
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 1, 0, 500, 500);
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 1, 500, 500);
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 1,   500);
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 1);
     wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 500);
-    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 450, 450);
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 500);
     // The wm_listener_surface_source_rectangle should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_SOURCE_RECT
-    ASSERT_EQ(ILM_NOTIFICATION_SOURCE_RECT, g_ilm_notification_mask);  
+    ASSERT_EQ(ILM_NOTIFICATION_SOURCE_RECT, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_surface_source_rectangle with notification = null
+    surface_id = 5;
+    wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 1, 0, 500, 500);
 }
 
-TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_invalidSurface)
+TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_invalidLayer)
 {
-    // Invoke the wm_listener_layer_source_rectangle with valid layer 
+    // Invoke the wm_listener_layer_source_rectangle with valid layer
     uint32_t layer_id = 1;
     wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 450, 450);
     // The wm_listener_layer_source_rectangle should trigger and expect g_ilm_notification_mask is is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x10, g_ilm_notification_mask);     
+    ASSERT_EQ(0x10, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_success)
@@ -1691,13 +1779,21 @@ TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with layerCallbackFunction
-    // Invoke the wm_listener_layer_source_rectangle with valid layer 
+    // Invoke the wm_listener_layer_source_rectangle with valid layer
     uint32_t layer_id = 100;
     ASSERT_EQ(ILM_SUCCESS, ilm_layerAddNotification(layer_id, &layerCallbackFunction));
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 1, 0, 1280, 720);
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 1, 1280, 720);
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1,    720);
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1280, 1);
     wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1280, 720);
-    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 450, 450);
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1280, 720);
     // The wm_listener_layer_source_rectangle should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_SOURCE_RECT
-    ASSERT_EQ(ILM_NOTIFICATION_SOURCE_RECT, g_ilm_notification_mask);     
+    ASSERT_EQ(ILM_NOTIFICATION_SOURCE_RECT, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_layer_source_rectangle with notification = null
+    layer_id = 500;
+    wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1280, 0);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_destination_rectangle_invalidSurface)
@@ -1713,13 +1809,21 @@ TEST_F(IlmControlTest, wm_listener_surface_destination_rectangle_success)
 {
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with surfaceCallbackFunction
-    // Invoke the wm_listener_surface_destination_rectangle with valid surface 
+    // Invoke the wm_listener_surface_destination_rectangle with valid surface
     uint32_t surface_id = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface_id, &surfaceCallbackFunction));
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 1, 0, 500, 500);
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 1, 500, 500);
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 1,   500);
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 1);
     wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 500);
-    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 450, 450);
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 500);
     // The wm_listener_surface_destination_rectangle should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_SOURCE_RECT
-    ASSERT_EQ(ILM_NOTIFICATION_DEST_RECT, g_ilm_notification_mask);     
+    ASSERT_EQ(ILM_NOTIFICATION_DEST_RECT, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_surface_destination_rectangle with notification = null
+    surface_id = 5;
+    wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 500, 0);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_destination_rectangle_invalidSurface)
@@ -1736,13 +1840,21 @@ TEST_F(IlmControlTest, wm_listener_layer_destination_rectangle_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with layerCallbackFunction
-    // Invoke the wm_listener_layer_destination_rectangle with valid layer 
+    // Invoke the wm_listener_layer_destination_rectangle with valid layer
     uint32_t layer_id = 100;
     ASSERT_EQ(ILM_SUCCESS, ilm_layerAddNotification(layer_id, &layerCallbackFunction));
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 1, 0, 1920, 1080);
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 1, 1920, 1080);
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1,    1080);
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1920, 1);
     wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1920, 1080);
-    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 450, 450);
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1920, 1080);
     // The wm_listener_layer_destination_rectangle should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_SOURCE_RECT
-    ASSERT_EQ(ILM_NOTIFICATION_DEST_RECT, g_ilm_notification_mask);    
+    ASSERT_EQ(ILM_NOTIFICATION_DEST_RECT, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_layer_destination_rectangle with notification = null
+    layer_id = 500;
+    wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 1280, 0);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_error_success)
@@ -1779,13 +1891,19 @@ TEST_F(IlmControlTest, wm_listener_surface_size_success)
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
     ilm_context.initialized = true;
     // Invoke the ilm_surfaceAddNotification with surfaceCallbackFunction
-    // Invoke the wm_listener_surface_size with valid surface 
+    // Invoke the wm_listener_surface_size with valid surface
     uint32_t surface_id = 1;
     ASSERT_EQ(ILM_SUCCESS, ilm_surfaceAddNotification(surface_id, &surfaceCallbackFunction));
+    wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 0, 500);
+    wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 500, 0);
     wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 500, 500);
-    wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 450, 450);
+    wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 500, 500);
     // The wm_listener_surface_size should trigger and expect g_ilm_notification_mask is ILM_NOTIFICATION_CONFIGURED
-    ASSERT_EQ(ILM_NOTIFICATION_CONFIGURED, g_ilm_notification_mask);  
+    ASSERT_EQ(ILM_NOTIFICATION_CONFIGURED, g_ilm_notification_mask);
+
+    // Invoke the wm_listener_surface_size with notification = null
+    surface_id = 5;
+    wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 0, 500);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_stats_invalidSurface)
@@ -1808,11 +1926,27 @@ TEST_F(IlmControlTest, output_listener_geometry_success)
     output_listener_geometry(mp_ctxScreen[0], nullptr, 0, 0, 0, 0, 0, nullptr, nullptr, 0);
 }
 
+TEST_F(IlmControlTest, output_listener_mode_failure)
+{
+    // Invoke the output_listener_mode with flags = 0
+    output_listener_mode(mp_ctxScreen[0], nullptr, 0, 0, 0, 0);
+}
+
 TEST_F(IlmControlTest, output_listener_mode_success)
 {
-    // Invoke the output_listener_mode
+    // Invoke the output_listener_mode with flags = 1
     output_listener_mode(mp_ctxScreen[0], nullptr, 1, 0, 0, 0);
+    // Invoke the output_listener_mode with transform
     mp_ctxScreen[0]->transform = WL_OUTPUT_TRANSFORM_90;
+    output_listener_mode(mp_ctxScreen[0], nullptr, 1, 0, 0, 0);
+    // Invoke the output_listener_mode with transform
+    mp_ctxScreen[0]->transform = WL_OUTPUT_TRANSFORM_270;
+    output_listener_mode(mp_ctxScreen[0], nullptr, 1, 0, 0, 0);
+    // Invoke the output_listener_mode with transform
+    mp_ctxScreen[0]->transform = WL_OUTPUT_TRANSFORM_FLIPPED_90;
+    output_listener_mode(mp_ctxScreen[0], nullptr, 1, 0, 0, 0);
+    // Invoke the output_listener_mode with transform
+    mp_ctxScreen[0]->transform = WL_OUTPUT_TRANSFORM_FLIPPED_270;
     output_listener_mode(mp_ctxScreen[0], nullptr, 1, 0, 0, 0);
 }
 
@@ -1834,14 +1968,20 @@ TEST_F(IlmControlTest, wm_screen_listener_screen_id_success)
     wm_screen_listener_screen_id(mp_ctxScreen[0], nullptr, 0);
 }
 
-// TEST_F(IlmControlTest, wm_screen_listener_layer_added_success)
-// {
-//     // Invoke the wm_screen_listener_layer_added
-//     custom_wl_array_init(&mp_ctxLayer[0]->render_order);
-//     // custom_wl_array_add(&mp_ctxScreen[0]->render_order, sizeof(uint32_t));
-//     wm_screen_listener_layer_added(&mp_ctxScreen[0], nullptr, 100);
-//     custom_wl_array_release(&mp_ctxScreen[0]->render_order);
-// }
+TEST_F(IlmControlTest, wm_screen_listener_layer_added_success)
+{
+    // Prepare fake for wl_array_add
+    uint32_t l_dataScreen = 0;
+    void *lp_elemData = &l_dataScreen;
+    SET_RETURN_SEQ(wl_array_add, &lp_elemData, 100);
+    // Invoke the wm_screen_listener_layer_added
+    wm_screen_listener_layer_added(&mp_ctxScreen[0], nullptr, 100);
+    // The wl_array_add should trigger once time and surface id should assign to member of array
+    ASSERT_EQ(1, wl_array_add_fake.call_count);
+    ASSERT_EQ(100, l_dataScreen);
+    // Free resource
+    custom_wl_array_release(&mp_ctxScreen[0]->render_order);
+}
 
 TEST_F(IlmControlTest, wm_screen_listener_connector_name_success)
 {
@@ -1900,17 +2040,18 @@ TEST_F(IlmControlTest, input_listener_seat_destroyed_invalidSeat)
     ASSERT_EQ(0, wl_list_remove_fake.call_count);
 }
 
-// TEST_F(IlmControlTest, input_listener_seat_destroyed_success)
-// {
-//     // Prepare fake for wl_list_remove, to remove real object
-//     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
-//     // Invoke the input_listener_seat_destroyed with valid a seat
-//     input_listener_seat_destroyed(&ilm_context.wl, nullptr, "KEYBOARD");
-//     // Expect the wl_list_remove should trigger
-//     ASSERT_EQ(1, wl_list_remove_fake.call_count);
-//     mp_ctxSeat[0]->seat_name = nullptr;
-//     mp_ctxSeat[0] = nullptr;
-// }
+TEST_F(IlmControlTest, input_listener_seat_destroyed_success)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Invoke the input_listener_seat_destroyed with valid a seat
+    input_listener_seat_destroyed(&ilm_context.wl, nullptr, "KEYBOARD");
+    // Expect the wl_list_remove should trigger
+    ASSERT_EQ(1, wl_list_remove_fake.call_count);
+    // TearDown require: Allocate dynamic memory for seat
+    mp_ctxSeat[0] = (struct seat_context*)malloc(sizeof(struct seat_context));
+    mp_ctxSeat[0]->seat_name = strdup(mp_ilmSeatNames[0]);
+}
 
 TEST_F(IlmControlTest, input_listener_input_focus_invalidSurface)
 {
@@ -1942,5 +2083,210 @@ TEST_F(IlmControlTest, input_listener_input_acceptance_invalidSurface)
     uint32_t surface_id = 6;
     int32_t accepted = 1;
     input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "", accepted);
+    // Expect the wl_list_remove, wl_list_insert_fake should not trigger
     ASSERT_EQ(0, wl_list_remove_fake.call_count);
+    ASSERT_EQ(0, wl_list_insert_fake.call_count);
+}
+
+TEST_F(IlmControlTest, input_listener_input_acceptance_invalidSeatAndAccepted)
+{
+    // Invoke the input_listener_input_acceptance with valid surface_id and invalid seat
+    uint32_t surface_id = 1;
+    int32_t accepted = 1;
+    input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "", accepted);
+    // Expect the wl_list_remove should not trigger, wl_list_insert_fake should trigger
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+    ASSERT_EQ(1, wl_list_insert_fake.call_count);
+    // Free resource
+    struct seat_context *lp_accepted_seat = (struct seat_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct seat_context, link));
+    free(lp_accepted_seat->seat_name);
+    free(lp_accepted_seat);
+}
+
+TEST_F(IlmControlTest, input_listener_input_acceptance_invalidSeatAndUnaccepted)
+{
+    // Invoke the input_listener_input_acceptance with valid surface_id and invalid seat
+    uint32_t surface_id = 1;
+    int32_t accepted = 0;
+    input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "", accepted);
+    // Expect the wl_list_remove, wl_list_insert_fake should not trigger
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+    ASSERT_EQ(0, wl_list_insert_fake.call_count);
+}
+
+TEST_F(IlmControlTest, input_listener_input_acceptance_Accepted)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Invoke the input_listener_input_acceptance with valid surface_id and valid seat
+    uint32_t surface_id = 1;
+    int32_t accepted = 1;
+    input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "KEYBOARD", accepted);
+    // Expect the wl_list_remove, wl_list_insert_fake should not trigger
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+    ASSERT_EQ(1, wl_list_insert_fake.call_count);
+    // Free resource
+    struct seat_context *lp_createSeat = (struct seat_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct seat_context, link));
+    free(lp_createSeat->seat_name);
+    free(lp_createSeat);
+}
+
+TEST_F(IlmControlTest, registry_handle_control_success)
+{
+    // Invoke the registry_handle_control
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"", 0);
+    // The wl_proxy_marshal_flags should not trigger
+    ASSERT_EQ(0, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(0, wl_proxy_add_listener_fake.call_count);
+
+    // Invoke the registry_handle_control
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"ivi_wm", 0);
+    // The wl_proxy_marshal_flags should trigger
+    ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(0, wl_proxy_add_listener_fake.call_count);
+
+    // Invoke the registry_handle_control
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"ivi_input", 0);
+    // The wl_proxy_marshal_flags should trigger
+    ASSERT_EQ(2, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(0, wl_proxy_add_listener_fake.call_count);
+
+    // Invoke the registry_handle_control with not insert new element
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"wl_output", 0);
+    // The wl_proxy_marshal_flags should trigger
+    ASSERT_EQ(3, wl_proxy_marshal_flags_fake.call_count);
+
+    // Invoke the registry_handle_control with not insert new element
+    struct wl_proxy *id[1];
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, id, 1);
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_failureResult, 1);
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"wl_output", 0);
+    // The wl_proxy_marshal_flags should trigger
+    ASSERT_EQ(4, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(1, wl_proxy_add_listener_fake.call_count);
+
+    // Invoke the registry_handle_control with insert new element
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, id, 1);
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_successResult, 1);
+    registry_handle_control(&ilm_context.wl, nullptr, 0 ,"wl_output", 0);
+    // The wl_proxy_marshal_flags should trigger
+    ASSERT_EQ(5, wl_proxy_marshal_flags_fake.call_count);
+    ASSERT_EQ(2, wl_proxy_add_listener_fake.call_count);
+    ASSERT_EQ(1, wl_list_insert_fake.call_count);
+    // free resource
+    struct screen_context *lp_createScreen = (struct screen_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct screen_context, link));
+    free(lp_createScreen);
+}
+
+TEST_F(IlmControlTest, registry_handle_control_remove_invalidName)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Invoke the registry_handle_control_remove
+    registry_handle_control_remove(&ilm_context.wl, nullptr, 10);
+    // wl_list_remove should trigger once time
+    ASSERT_EQ(0, wl_list_remove_fake.call_count);
+}
+
+TEST_F(IlmControlTest, registry_handle_control_remove_oneNode)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+
+    // Invoke the registry_handle_control_remove
+    registry_handle_control_remove(&ilm_context.wl, nullptr, 0);
+    // wl_list_remove should trigger once time
+    ASSERT_EQ(1, wl_list_remove_fake.call_count);
+    // Allocate memory for the resource
+    mp_ctxScreen[0] = (struct screen_context*)malloc(sizeof(struct screen_context));
+
+    // Invoke the registry_handle_control_remove
+    mp_ctxScreen[1]->controller = NULL;
+    mp_ctxScreen[1]->output = NULL;
+    registry_handle_control_remove(&ilm_context.wl, nullptr, 1);
+    // wl_list_remove should trigger 2 time
+    ASSERT_EQ(2, wl_list_remove_fake.call_count);
+    // Allocate memory for the resource
+    mp_ctxScreen[1] = (struct screen_context*)malloc(sizeof(struct screen_context));
+}
+
+TEST_F(IlmControlTest, ilmControl_init_failed)
+{
+    // Invoke the ilmControl_init
+    ilm_context.initialized = true;
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(0));
+
+    // Invoke the ilmControl_init
+    ilm_context.initialized = false;
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
+}
+
+TEST_F(IlmControlTest, ilmControl_init_error)
+{
+    // Invoke the ilmControl_init
+    ASSERT_EQ(ILM_ERROR_INVALID_ARGUMENTS, ilmControl_init(0));
+}
+
+// TEST_F(IlmControlTest, ilmControl_init_success)
+// {
+//     ilm_context.wl.controller = nullptr;
+//     // Prepare fake for wl_display_create_queue, to return success
+//     struct wl_event_queue *queue[1];
+//     SET_RETURN_SEQ(wl_display_create_queue, queue, 1);
+//     // Prepare fake for wl_display_create_queue, to return success
+//     // struct wl_registry *registry[1];
+//     // SET_RETURN_SEQ(wl_display_get_registry, registry, 1);
+
+//     // Invoke the ilmControl_init
+//     ilm_context.initialized = false;
+//     ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
+// }
+
+// TEST_F(IlmControlTest, screenshot_error_success)
+// {
+//     // Prepare fake for wl_proxy_destroy_fake, to remove real object
+//     // wl_proxy_destroy_fake.custom_fake = custom_wl_list_remove;
+//     screenshot_error(nullptr, nullptr, 0, "");
+//     ASSERT_EQ(0, wl_proxy_destroy_fake.call_count);
+// }
+
+TEST_F(IlmControlTest, ilm_takeScreenshot_invalidScreen)
+{
+    // Invoke the ilm_takeScreenshot
+    ASSERT_EQ(ILM_FAILED, ilm_takeScreenshot(1, "test"));
+}
+
+TEST_F(IlmControlTest, ilm_takeScreenshot_success)
+{
+    // Invoke the ilm_takeScreenshot
+    ASSERT_EQ(ILM_FAILED, ilm_takeScreenshot(10, "test"));
+
+    // Prepare fake for wl_proxy_marshal_flags and wl_display_dispatch_queue, to return success
+    struct wl_proxy *screenshot[1];
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, screenshot, 1);
+    SET_RETURN_SEQ(wl_display_dispatch_queue, mp_failureResult, 1);
+    // Invoke the ilm_takeScreenshot
+    ASSERT_EQ(ILM_FAILED, ilm_takeScreenshot(10, "test"));
+}
+
+TEST_F(IlmControlTest, ilm_takeSurfaceScreenshot_invalidScreen)
+{
+    // Invoke the ilm_takeSurfaceScreenshot
+    ASSERT_EQ(ILM_FAILED, ilm_takeSurfaceScreenshot("test", 1));
+}
+
+TEST_F(IlmControlTest, ilm_takeSurfaceScreenshot_success)
+{
+    // Prepare fake for wl_proxy_marshal_flags and wl_display_dispatch_queue, to return success
+    struct wl_proxy *screenshot[1];
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, screenshot, 1);
+    SET_RETURN_SEQ(wl_display_dispatch_queue, mp_failureResult, 1);
+    // Invoke the ilm_takeSurfaceScreenshot
+    ASSERT_EQ(ILM_FAILED, ilm_takeSurfaceScreenshot("test", 1));
+}
+
+TEST_F(IlmControlTest, screenshot_error_success)
+{
+    // Invoke the screenshot_error
+    screenshot_error(&ilm_context.wl, nullptr, 1, "Error");
 }
