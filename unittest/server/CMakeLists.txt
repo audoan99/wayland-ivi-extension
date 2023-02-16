@@ -92,9 +92,12 @@ SET(SRC_INPUT_CONTROLLER_FILES
     ivi-input-protocol.c
 )
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../CodeCoverage.cmake)
+append_coverage_compiler_flags()
+
 SET(GCC_SANITIZER_COMPILE_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector-all -fpermissive")
-SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread" )
-SET( CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan" )
+SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread -g -O3 -fprofile-arcs -ftest-coverage" )
+SET( CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan -g -O3 -fprofile-arcs -ftest-coverage" )
 
 ADD_EXECUTABLE(test_ilm_server_controller ${SRC_CONTROLLER_FILES} ${SRC_COMMON_FILES})
 TARGET_LINK_LIBRARIES(test_ilm_server_controller ${LIBS})
