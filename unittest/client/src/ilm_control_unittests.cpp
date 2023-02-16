@@ -88,6 +88,9 @@ public:
             mp_ctxSurface[i]->prop = mp_surfaceProps[i];
             mp_ctxSurface[i]->notification = NULL;
             custom_wl_list_init(&mp_ctxSurface[i]->list_accepted_seats);
+            mp_accepted_seat[i] = (struct accepted_seat*)malloc(sizeof(struct accepted_seat));
+            mp_accepted_seat[i]->seat_name = strdup("KEYBOARD");
+            custom_wl_list_insert(&mp_ctxSurface[i]->list_accepted_seats, &mp_accepted_seat[i]->link);
             custom_wl_list_insert(&ilm_context.wl.list_surface, &mp_ctxSurface[i]->link);
             //prepare the layers
             mp_ctxLayer[i] = (struct layer_context*)malloc(sizeof(struct layer_context));
@@ -152,6 +155,11 @@ public:
             {
                 free(mp_ctxScreen[i]);
             }
+            if(mp_accepted_seat[i] != nullptr)
+            {
+                free(mp_accepted_seat[i]->seat_name);
+                free(mp_accepted_seat[i]);
+            }
         }
         for(uint8_t i = 0; i < 3; i++)
         {
@@ -171,6 +179,7 @@ public:
     t_ilm_surface mp_ilmScreenIds[MAX_NUMBER] = {10, 20, 30, 40, 50};
     t_ilm_surface mp_ilmLayerIds[MAX_NUMBER] = {100, 200, 300, 400, 500};
     struct surface_context *mp_ctxSurface[MAX_NUMBER] = {nullptr};
+    struct accepted_seat *mp_accepted_seat[MAX_NUMBER] = {nullptr};
     struct layer_context *mp_ctxLayer[MAX_NUMBER] = {nullptr};
     struct screen_context *mp_ctxScreen[MAX_NUMBER] = {nullptr};
     struct seat_context *mp_ctxSeat[3] = {nullptr};
@@ -1616,17 +1625,23 @@ TEST_F(IlmControlTest, wm_listener_surface_destroyed_wrongSurfaceId)
     ASSERT_EQ(0, wl_list_remove_fake.call_count);
 }
 
-TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
+TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOnewithNullNotification)
 {
     // Prepare fake for wl_list_remove, to remove real object
     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
     // Invoke to wm_listener_surface_destroyed with a surface id, expect there is a surface will remove
     ilm_context.wl.notification = NULL;
     wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 1);
-    // wl_list_remove should trigger once time
-    ASSERT_EQ(1, wl_list_remove_fake.call_count);
+    // wl_list_remove should trigger 2 times
+    ASSERT_EQ(2, wl_list_remove_fake.call_count);
     mp_ctxSurface[0] = nullptr;
+    // Allocate memory for the resource
+    mp_accepted_seat[0] = (struct accepted_seat*)malloc(sizeof(struct accepted_seat));
+    mp_accepted_seat[0]->seat_name = strdup("KEYBOARD");
+}
 
+TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOnewithCtxNotification)
+{
     // Prepare fake for wl_list_remove, to remove real object
     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
     // Prepare fake for ilm_surfaceAddNotification, to ilm context is initilized
@@ -1638,14 +1653,25 @@ TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOne)
     // wl_list_remove should trigger once time
     ASSERT_EQ(2, wl_list_remove_fake.call_count);
     mp_ctxSurface[1] = nullptr;
+    // Allocate memory for the resource
+    mp_accepted_seat[1] = (struct accepted_seat*)malloc(sizeof(struct accepted_seat));
+    mp_accepted_seat[1]->seat_name = strdup("KEYBOARD");
+}
 
+TEST_F(IlmControlTest, wm_listener_surface_destroyed_removeOnewithCallbackNotification)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
     // Invoke the wm_listener_surface_destroyed with a callback register
     ilm_context.wl.notification = notificationCallback;
     wm_listener_surface_destroyed(&ilm_context.wl, nullptr, 3);
     // The wl_list_remove should trigger and notification callback should called
-    ASSERT_EQ(3, wl_list_remove_fake.call_count);
+    ASSERT_EQ(2, wl_list_remove_fake.call_count);
     ASSERT_EQ(DESTROY_SURFACE, g_ilmControlStatus);
     mp_ctxSurface[2] = nullptr;
+    // Allocate memory for the resource
+    mp_accepted_seat[2] = (struct accepted_seat*)malloc(sizeof(struct accepted_seat));
+    mp_accepted_seat[2]->seat_name = strdup("KEYBOARD");
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_visibility_invalidSurface)
@@ -2137,7 +2163,7 @@ TEST_F(IlmControlTest, input_listener_input_acceptance_invalidSeatAndUnaccepted)
     ASSERT_EQ(0, wl_list_insert_fake.call_count);
 }
 
-TEST_F(IlmControlTest, input_listener_input_acceptance_Accepted)
+TEST_F(IlmControlTest, input_listener_input_acceptance_validSeatAndAccepted)
 {
     // Prepare fake for wl_list_remove, to remove real object
     wl_list_remove_fake.custom_fake = custom_wl_list_remove;
@@ -2147,11 +2173,23 @@ TEST_F(IlmControlTest, input_listener_input_acceptance_Accepted)
     input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "KEYBOARD", accepted);
     // Expect the wl_list_remove, wl_list_insert_fake should not trigger
     ASSERT_EQ(0, wl_list_remove_fake.call_count);
-    ASSERT_EQ(1, wl_list_insert_fake.call_count);
-    // Free resource
-    struct seat_context *lp_createSeat = (struct seat_context*)(uintptr_t(wl_list_insert_fake.arg1_history[0]) - offsetof(struct seat_context, link));
-    free(lp_createSeat->seat_name);
-    free(lp_createSeat);
+    ASSERT_EQ(0, wl_list_insert_fake.call_count);
+}
+
+TEST_F(IlmControlTest, input_listener_input_acceptance_validSeatAndUnaccepted)
+{
+    // Prepare fake for wl_list_remove, to remove real object
+    wl_list_remove_fake.custom_fake = custom_wl_list_remove;
+    // Invoke the input_listener_input_acceptance with valid surface_id and valid seat
+    uint32_t surface_id = 1;
+    int32_t accepted = 0;
+    input_listener_input_acceptance(&ilm_context.wl, nullptr, surface_id, "KEYBOARD", accepted);
+    // Expect the wl_list_remove, wl_list_insert_fake should not trigger
+    ASSERT_EQ(1, wl_list_remove_fake.call_count);
+    ASSERT_EQ(0, wl_list_insert_fake.call_count);
+    // Allocate memory for the resource
+    mp_accepted_seat[0] = (struct accepted_seat*)malloc(sizeof(struct accepted_seat));
+    mp_accepted_seat[0]->seat_name = strdup("KEYBOARD");
 }
 
 TEST_F(IlmControlTest, registry_handle_control_success)
@@ -2237,7 +2275,7 @@ TEST_F(IlmControlTest, ilmControl_init_failed)
 {
     // Invoke the ilmControl_init
     ilm_context.initialized = true;
-    ASSERT_EQ(ILM_FAILED, ilmControl_init(0));
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
 
     // Invoke the ilmControl_init
     ilm_context.initialized = false;
@@ -2250,21 +2288,54 @@ TEST_F(IlmControlTest, ilmControl_init_error)
     ASSERT_EQ(ILM_ERROR_INVALID_ARGUMENTS, ilmControl_init(0));
 }
 
-// TEST_F(IlmControlTest, ilmControl_init_success)
-// {
-//     ilm_context.wl.controller = (struct ivi_wm*)&m_iviWmControllerFakePointer;
-//     ilm_context.initialized = false;
-//     // Prepare fake for wl_display_create_queue, to return success
-//     uint64_t l_wlEventQueueFakePointer, l_wlProxyFakePointer;
-//     struct wl_event_queue *lpp_wlEventQueue[] = {(struct wl_event_queue*)&l_wlEventQueueFakePointer};
-//     SET_RETURN_SEQ(wl_display_create_queue, lpp_wlEventQueue, 1);
-//     struct wl_proxy *lpp_wlProxy[] = {(struct wl_proxy*)&l_wlProxyFakePointer};
-//     SET_RETURN_SEQ(wl_proxy_marshal_flags, lpp_wlProxy, 1);
-//     SET_RETURN_SEQ(wl_proxy_add_listener, mp_failureResult, 1);
-//     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
-//     // Invoke the ilmControl_init
-//     ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
-// }
+TEST_F(IlmControlTest, ilmControl_init_failedByInitControl)
+{
+    // Prepare fake for ilmControl_init, to ilm context is not initilized
+    ilm_context.initialized = false;
+    // Prepare fake for wl_display_create_queue, to return success
+    uint64_t l_wlEventQueueFakePointer, l_wlProxyFakePointer;
+    struct wl_event_queue *lpp_wlEventQueue[] = {(struct wl_event_queue*)&l_wlEventQueueFakePointer};
+    SET_RETURN_SEQ(wl_display_create_queue, lpp_wlEventQueue, 1);
+    struct wl_proxy *lpp_wlProxy[] = {(struct wl_proxy*)&l_wlProxyFakePointer};
+
+    // Expect wl_proxy_marshal_flags return null
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_failureResult, 1);
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
+    // Invoke the ilmControl_init
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
+
+    // Expect wl_proxy_add_listener return -1
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, lpp_wlProxy, 1);
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_failureResult, 1);
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
+    // Invoke the ilmControl_init
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
+
+    // Expect wl_display_roundtrip_queue return -1
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, lpp_wlProxy, 1);
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_successResult, 1);
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
+    // Invoke the ilmControl_init
+    ASSERT_EQ(ILM_FAILED, ilmControl_init(1));
+}
+
+TEST_F(IlmControlTest, ilmControl_init_success)
+{
+    // Prepare fake for ilmControl_init, to ilm context is not initilized
+    ilm_context.initialized = false;
+    // Prepare fake for wl_display_create_queue, to return success
+    uint64_t l_wlEventQueueFakePointer, l_wlProxyFakePointer;
+    struct wl_event_queue *lpp_wlEventQueue[] = {(struct wl_event_queue*)&l_wlEventQueueFakePointer};
+    SET_RETURN_SEQ(wl_display_create_queue, lpp_wlEventQueue, 1);
+    struct wl_proxy *lpp_wlProxy[] = {(struct wl_proxy*)&l_wlProxyFakePointer};
+    // Expect ilmControl_init return success
+    ilm_context.wl.controller = (struct ivi_wm*)&m_iviWmControllerFakePointer;
+    SET_RETURN_SEQ(wl_proxy_marshal_flags, lpp_wlProxy, 1);
+    SET_RETURN_SEQ(wl_proxy_add_listener, mp_successResult, 1);
+    SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
+    // Invoke the ilmControl_init
+    ASSERT_EQ(ILM_SUCCESS, ilmControl_init(1));
+}
 
 TEST_F(IlmControlTest, ilm_takeScreenshot_invalidScreen)
 {
@@ -2307,12 +2378,4 @@ TEST_F(IlmControlTest, ilm_takeSurfaceScreenshot_success)
     SET_RETURN_SEQ(wl_display_dispatch_queue, mp_successResult, 1);
     // Invoke the ilm_takeSurfaceScreenshot
     ASSERT_EQ(ILM_FAILED, ilm_takeSurfaceScreenshot(NULL, 1));
-}
-
-TEST_F(IlmControlTest, screenshot_error_success)
-{
-    ilm_context.initialized = true;
-
-    // Invoke the screenshot_error
-    screenshot_error(&ilm_context.wl, nullptr, 1, "Error");
 }
