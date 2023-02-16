@@ -68,7 +68,7 @@ SET(SRC_IVI_INPUT_FILES
 )
 
 
-include(CodeCoverage.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../CodeCoverage.cmake)
 append_coverage_compiler_flags()
 
 SET(GCC_SANITIZER_COMPILE_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector-all -fpermissive")
