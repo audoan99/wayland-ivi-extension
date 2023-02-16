@@ -269,6 +269,7 @@ static bool setupForGetFuncCallbacks()
     }
     g_testController.m_send_layer_prop = lp_iviLayer->property_changed.notify;
 
+    free(lp_iviShell->ivi_client_name);
     free(lp_iviShell);
     free(lp_iviController);
     free(lp_screenShotFrame);
