@@ -292,24 +292,26 @@ TEST_F(IdAgentTest, id_agent_module_init_hasDefaultBehaviorNoDesktopApp)
     SET_RETURN_SEQ(wet_get_config, (struct weston_config **)&mp_fakePointer, 1);
     SET_RETURN_SEQ(weston_config_get_section, (struct weston_config_section **)&mp_fakePointer, 1);
     // Prepare fake for weston_config_section_get_uint
-    IdAgentTest::ms_defaultSurfaceId = 100;
-    IdAgentTest::ms_defaultSurfaceIdMax = 200;
+    IdAgentTest::ms_defaultSurfaceId = INVALID_ID;
+    IdAgentTest::ms_defaultSurfaceIdMax = INVALID_ID;
     weston_config_section_get_uint_fake.custom_fake = custom_weston_config_section_get_uint;
-    // Invoke the id_agent_module_init, expected a success
-    EXPECT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), IVI_SUCCEEDED);
+    // Invoke the id_agent_module_init, expected a failure
+    EXPECT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), -1);
+
+    // Invoke the id_agent_module_init for the second time, expected a failure
+    IdAgentTest::ms_defaultSurfaceId = 100;
+    IdAgentTest::ms_defaultSurfaceIdMax = INVALID_ID;
+    EXPECT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), -1);
+
     /* Check the logic
      * If no desktop-app and default behavior enable, the weston_config_section_get_uint should trigger two times
      */
-    EXPECT_EQ(wet_get_config_fake.call_count, 1);
-    EXPECT_EQ(weston_config_get_section_fake.call_count, 1);
-    EXPECT_EQ(weston_config_section_get_uint_fake.call_count, 2);
+    EXPECT_EQ(wet_get_config_fake.call_count, 2);
+    EXPECT_EQ(weston_config_get_section_fake.call_count, 2);
+    EXPECT_EQ(weston_config_section_get_uint_fake.call_count, 4);
     EXPECT_EQ(weston_config_section_get_string_fake.call_count, 0);
-    //free resource
-    struct ivi_id_agent *lp_idAgent = (struct ivi_id_agent*)(uintptr_t(wl_list_init_fake.arg0_history[0]) - offsetof(struct ivi_id_agent, app_list));
-    free(lp_idAgent);
 }
 
-// @Todo this have issue with doulbe free, the dbElem->appTitle, dbElem->appId is not allocated, but free when deinit
 TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithInvalidSurfaceId)
 {
     // Prepare fake of the wl_list custom function
@@ -337,7 +339,6 @@ TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithInval
     ASSERT_EQ(weston_config_section_get_string_fake.call_count, 0);
 }
 
-// @Todo this have issue with doulbe free, the dbElem->appTitle, dbElem->appId is not allocated, but free when deinit
 TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithNullOfAppIdAndAppTitle)
 {
     // Prepare fake of the wl_list custom function
@@ -368,8 +369,6 @@ TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithNullO
     ASSERT_EQ(weston_config_section_get_string_fake.call_count, 2);
 }
 
-// @Todo maybe have logic issue here, do we must have the default-app-default section?
-// only that section configed the default id and default max id
 TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithRightConfig)
 {
     // Prepare fake of the wl_list custom function
@@ -389,7 +388,7 @@ TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithRight
     IdAgentTest::ms_appTitle = (char*)"app_0";
     weston_config_section_get_uint_fake.custom_fake = custom_weston_config_section_get_uint;
     weston_config_section_get_string_fake.custom_fake = custom_weston_config_section_get_string;
-    // Invoke the id_agent_module_init, expected a success
+    // Invoke the id_agent_module_init, expected a failure
     ASSERT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), -1);
 
     /* Check the logic
@@ -399,13 +398,8 @@ TEST_F(IdAgentTest, id_agent_module_init_noDefaultBehaviorHasDesktopAppWithRight
     ASSERT_EQ(weston_config_next_section_fake.call_count, 1);
     ASSERT_EQ(weston_config_section_get_uint_fake.call_count, 1);
     ASSERT_EQ(weston_config_section_get_string_fake.call_count, 2);
-    //free resource
-    // struct ivi_id_agent *lp_idAgent = (struct ivi_id_agent*)(uintptr_t(wl_list_init_fake.arg0_history[0]) - offsetof(struct ivi_id_agent, app_list));
-    // id_agent_module_deinit(&lp_idAgent->destroy_listener, nullptr);
 }
 
-// @Todo maybe have logic issue here, range of surface id in check_config functions
-// enable free resoure, if there is a change in the lib
 TEST_F(IdAgentTest, id_agent_module_init_hasDefaultBehaviorHasDesktopAppWithRightConfig)
 {
     // Prepare fake of the wl_list custom function
@@ -428,7 +422,7 @@ TEST_F(IdAgentTest, id_agent_module_init_hasDefaultBehaviorHasDesktopAppWithRigh
     IdAgentTest::ms_appTitle = (char*)"app_0";
     weston_config_section_get_uint_fake.custom_fake = custom_weston_config_section_get_uint;
     weston_config_section_get_string_fake.custom_fake = custom_weston_config_section_get_string;
-    // Invoke the id_agent_module_init, expected a success
+    // Invoke the id_agent_module_init, expected a failure
     EXPECT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), -1);
     /* Check the logic
      * Enable default behavior
@@ -439,7 +433,40 @@ TEST_F(IdAgentTest, id_agent_module_init_hasDefaultBehaviorHasDesktopAppWithRigh
     EXPECT_EQ(weston_config_get_section_fake.call_count, 1);
     EXPECT_EQ(weston_config_section_get_uint_fake.call_count, 3);
     EXPECT_EQ(weston_config_section_get_string_fake.call_count, 2);
-    //free resource
-    struct ivi_id_agent *lp_idAgent = (struct ivi_id_agent*)(uintptr_t(wl_list_init_fake.arg0_history[0]) - offsetof(struct ivi_id_agent, app_list));
-    //id_agent_module_deinit(&lp_idAgent->destroy_listener, nullptr);
+}
+
+TEST_F(IdAgentTest, id_agent_module_init_success)
+{
+    // Prepare fake of the wl_list custom function
+    wl_list_init_fake.custom_fake = custom_wl_list_init;
+    wl_list_insert_fake.custom_fake = custom_wl_list_insert;
+    wl_list_empty_fake.custom_fake = custom_wl_list_empty;
+    // Prepare fake for wet_get_config, weston_config_get_section and weston_config_next_section, first time return true and there is a desktop-app section, second time return a failure
+    int (*weston_config_next_section_fakes[])(struct weston_config *, struct weston_config_section **, const char **) = {
+        custom_weston_config_next_section_1,
+        custom_weston_config_next_section_2
+    };
+    SET_RETURN_SEQ(wet_get_config, (struct weston_config **)&mp_fakePointer, 1);
+    SET_RETURN_SEQ(weston_config_get_section, (struct weston_config_section **)&mp_fakePointer, 1);
+    SET_CUSTOM_FAKE_SEQ(weston_config_next_section, weston_config_next_section_fakes, 2);
+    // Prepare the right appId, AppTitle and surface id
+    IdAgentTest::ms_defaultSurfaceId = 100;
+    IdAgentTest::ms_defaultSurfaceIdMax = 200;
+    IdAgentTest::ms_surfaceId = IdAgentTest::ms_defaultSurfaceId - 1;
+    IdAgentTest::ms_appId = (char*)"0";
+    IdAgentTest::ms_appTitle = (char*)"app_0";
+    weston_config_section_get_uint_fake.custom_fake = custom_weston_config_section_get_uint;
+    weston_config_section_get_string_fake.custom_fake = custom_weston_config_section_get_string;
+    // Invoke the id_agent_module_init, expected a success
+    EXPECT_EQ(id_agent_module_init(&m_westonCompositor, &g_iviLayoutInterfaceFake), 0);
+    
+    /* Check the logic
+     * Enable default behavior
+     * If lib get the expected string for of app-title and app-id, surface id in desktop-app section, it should return a success
+     */
+    EXPECT_EQ(wet_get_config_fake.call_count, 1);
+    EXPECT_EQ(weston_config_next_section_fake.call_count, 2);
+    EXPECT_EQ(weston_config_get_section_fake.call_count, 1);
+    EXPECT_EQ(weston_config_section_get_uint_fake.call_count, 3);
+    EXPECT_EQ(weston_config_section_get_string_fake.call_count, 2);
 }
