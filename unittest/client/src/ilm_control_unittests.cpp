@@ -56,6 +56,7 @@ public:
         init_ctx_list_content();
         CLIENT_API_FAKE_LIST(RESET_FAKE);
         g_ilmControlStatus = NONE;
+        g_ilm_notification_mask = ILM_NOTIFICATION_ALL;
     }
 
     void TearDown()
@@ -1680,7 +1681,7 @@ TEST_F(IlmControlTest, wm_listener_surface_visibility_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_visibility(&ilm_context.wl, nullptr, surface_id, 0.5);
     // The wm_listener_surface_visibility should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x80, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_visibility_success)
@@ -1708,7 +1709,7 @@ TEST_F(IlmControlTest, wm_listener_layer_visibility_invalidLayer)
     ilm_context.wl.controller = nullptr;
     wm_listener_layer_visibility(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_visibility should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x02, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_visibility_success)
@@ -1735,7 +1736,7 @@ TEST_F(IlmControlTest, wm_listener_surface_opacity_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_opacity(&ilm_context.wl, nullptr, surface_id, 0.5);
     // The wm_listener_surface_opacity should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x02, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_opacity_success)
@@ -1762,7 +1763,7 @@ TEST_F(IlmControlTest, wm_listener_layer_opacity_invalidLayer)
     uint32_t layer_id = 1;
     wm_listener_layer_opacity(&ilm_context.wl, nullptr, layer_id, 0.5);
     // The wm_listener_layer_opacity should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x04, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_opacity_success)
@@ -1789,7 +1790,7 @@ TEST_F(IlmControlTest, wm_listener_surface_source_rectangle_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_source_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 450, 450);
     // The wm_listener_surface_source_rectangle should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x04, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_source_rectangle_success)
@@ -1820,7 +1821,7 @@ TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_invalidLayer)
     uint32_t layer_id = 1;
     wm_listener_layer_source_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 450, 450);
     // The wm_listener_layer_source_rectangle should trigger and expect g_ilm_notification_mask is is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x10, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_source_rectangle_success)
@@ -1851,7 +1852,7 @@ TEST_F(IlmControlTest, wm_listener_surface_destination_rectangle_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_destination_rectangle(&ilm_context.wl, nullptr, surface_id, 0, 0, 450, 450);
     // The wm_listener_surface_destination_rectangle should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x10, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_destination_rectangle_success)
@@ -1881,7 +1882,7 @@ TEST_F(IlmControlTest, wm_listener_layer_destination_rectangle_invalidSurface)
     uint32_t layer_id = 1;
     wm_listener_layer_destination_rectangle(&ilm_context.wl, nullptr, layer_id, 0, 0, 450, 450);
     // The wm_listener_surface_destination_rectangle should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x20, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_layer_destination_rectangle_success)
@@ -1932,7 +1933,7 @@ TEST_F(IlmControlTest, wm_listener_surface_size_invalidSurface)
     uint32_t surface_id = 6;
     wm_listener_surface_size(&ilm_context.wl, nullptr, surface_id, 450, 450);
     // The wm_listener_surface_size should trigger and expect g_ilm_notification_mask is not in enum t_ilm_notification_mask
-    ASSERT_EQ(0x20, g_ilm_notification_mask);
+    ASSERT_EQ(ILM_NOTIFICATION_ALL, g_ilm_notification_mask);
 }
 
 TEST_F(IlmControlTest, wm_listener_surface_size_success)
