@@ -67,13 +67,11 @@ SET(SRC_IVI_INPUT_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ilm_input_uinttests.cpp
 )
 
-
-include(${CMAKE_CURRENT_SOURCE_DIR}/../CodeCoverage.cmake)
-append_coverage_compiler_flags()
-
+SET(COVERAGE_COMPILER_FLAGS "-g --coverage")
 SET(GCC_SANITIZER_COMPILE_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover -fstack-protector-all -fpermissive")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread -g -O3 -fprofile-arcs -ftest-coverage")
-SET(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan -g -O3 -fprofile-arcs -ftest-coverage")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COVERAGE_COMPILER_FLAGS}")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_SANITIZER_COMPILE_FLAGS} -pthread ${COVERAGE_COMPILER_FLAGS}")
+SET(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libasan -static-libubsan ${COVERAGE_COMPILER_FLAGS}")
 
 ADD_EXECUTABLE(test_ilm_client_common ${SRC_COMMON_FILES} ${SRC_IVI_COMMON_FILES} ${ILM_COMMON_SRC})
 TARGET_LINK_LIBRARIES(test_ilm_client_common ${LIBS})
