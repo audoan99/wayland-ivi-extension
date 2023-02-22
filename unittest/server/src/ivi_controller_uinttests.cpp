@@ -798,3 +798,19 @@ TEST_F(ControllerTests, wet_module_init_canGetWestonConfig)
     free(lp_iviShell->debug_scopes);
     free(lp_iviShell);
 }
+
+TEST_F(ControllerTests, controller_screen_destroy_success)
+{
+    // Invoke the controller_screen_destroy
+    controller_screen_destroy(nullptr, nullptr);
+    // The wl_resource_destroy should trigger once time
+    EXPECT_EQ(wl_resource_destroy_fake.call_count, 1);
+}
+
+TEST_F(ControllerTests, controller_screen_clear_cannotGetUserData)
+{
+    // Invoke the controller_screen_clear
+    controller_screen_clear(nullptr, nullptr);
+    // The wl_resource_post_event should trigger once time
+    EXPECT_EQ(wl_resource_post_event_fake.call_count, 1);
+}
