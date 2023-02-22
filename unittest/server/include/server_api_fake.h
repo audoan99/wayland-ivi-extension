@@ -94,6 +94,8 @@ DECLARE_FAKE_VALUE_FUNC(int, wl_list_empty, const struct wl_list *);
 DECLARE_FAKE_VOID_FUNC(weston_keyboard_end_grab, struct weston_keyboard *);
 DECLARE_FAKE_VOID_FUNC(weston_pointer_end_grab, struct weston_pointer *);
 DECLARE_FAKE_VOID_FUNC(weston_touch_end_grab, struct weston_touch *);
+DECLARE_FAKE_VOID_FUNC(weston_output_schedule_repaint, struct weston_output *);
+DECLARE_FAKE_VALUE_FUNC(pixman_bool_t, pixman_region32_union, pixman_region32_t *, pixman_region32_t *, pixman_region32_t *);
 
 #define SERVER_API_FAKE_LIST(FAKE) \
     FAKE(weston_config_get_section) \
@@ -175,6 +177,8 @@ DECLARE_FAKE_VOID_FUNC(weston_touch_end_grab, struct weston_touch *);
     FAKE(weston_keyboard_end_grab) \
     FAKE(weston_pointer_end_grab) \
     FAKE(weston_touch_end_grab) \
+    FAKE(weston_output_schedule_repaint) \
+    FAKE(pixman_region32_union) \
     FFF_RESET_HISTORY()
      // FAKE(weston_log) // make a common custom weston_log to print the log
 

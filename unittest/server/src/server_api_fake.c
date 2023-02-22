@@ -83,6 +83,8 @@ DEFINE_FAKE_VALUE_FUNC(int, wl_list_empty, const struct wl_list *);
 DEFINE_FAKE_VOID_FUNC(weston_keyboard_end_grab, struct weston_keyboard *);
 DEFINE_FAKE_VOID_FUNC(weston_pointer_end_grab, struct weston_pointer *);
 DEFINE_FAKE_VOID_FUNC(weston_touch_end_grab, struct weston_touch *);
+DEFINE_FAKE_VOID_FUNC(weston_output_schedule_repaint, struct weston_output *);
+DEFINE_FAKE_VALUE_FUNC(pixman_bool_t, pixman_region32_union, pixman_region32_t *, pixman_region32_t *, pixman_region32_t *);
 
 int custom_weston_log(const char *format, va_list ap)
 {
