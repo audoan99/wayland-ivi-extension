@@ -385,7 +385,7 @@ TEST_F(IlmControlTest, ilm_getScreenIDs_cannotSyncAcquireInstance)
     ilm_context.initialized = false;
     // Invoke the ilm_getScreenIDs, expected the ILM_FAILED
     ASSERT_EQ(ILM_FAILED, ilm_getScreenIDs(&l_numberIds, &lp_listIds));
-    // Set the ilm context initialized is true and prepare fake for wl_display_roundtrip_queue, to return faileure
+    // Set the ilm context initialized is true and prepare fake for wl_display_roundtrip_queue, to return failure
     ilm_context.initialized = true;
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
     // Invoke the ilm_getScreenIDs, expeted return failure
@@ -558,7 +558,7 @@ TEST_F(IlmControlTest, ilm_getLayerIDsOnScreen_success)
     EXPECT_EQ(l_numberLayers, 2);
     EXPECT_EQ(lp_listLayers[0], 100);
     EXPECT_EQ(lp_listLayers[1], 200);
-    //free resource
+    // free resource
     free(lp_listLayers);
     custom_wl_array_release(&mp_ctxScreen[0]->render_order);
 }
@@ -608,7 +608,7 @@ TEST_F(IlmControlTest, ilm_getSurfaceIDs_success)
     {
         EXPECT_EQ(lp_listSurfaces[i], mp_ilmSurfaceIds[i]);
     }
-    //free resource
+    // free resource
     free(lp_listSurfaces);
 }
 
@@ -1079,7 +1079,6 @@ TEST_F(IlmControlTest, ilm_surfaceGetVisibility_success)
     ASSERT_EQ(1, wl_proxy_marshal_flags_fake.call_count);
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
 }
-////
 
 TEST_F(IlmControlTest, ilm_surfaceSetOpacity_wrongCtx)
 {
@@ -1261,7 +1260,7 @@ TEST_F(IlmControlTest, ilm_displaySetRenderOrder_wrongCtx)
 
 TEST_F(IlmControlTest, ilm_displaySetRenderOrder_invalidDisplayId)
 {
-    // Invoke the lm_displaySetRenderOrder with invalid layerId, expect return failure
+    // Invoke the ilm_displaySetRenderOrder with invalid layerId, expect return failure
     t_ilm_display displayId = 11;
     t_ilm_int number = 1;
     ASSERT_EQ(ILM_FAILED, ilm_displaySetRenderOrder(displayId, mp_ilmLayerIds, number));
@@ -1273,7 +1272,7 @@ TEST_F(IlmControlTest, ilm_displaySetRenderOrder_invalidDisplayId)
 TEST_F(IlmControlTest, ilm_displaySetRenderOrder_success)
 {
     // ilm context is initilized
-    // Invoke the ilm_layerSetRenderOrder with valid layerId, expect return success
+    // Invoke the ilm_displaySetRenderOrder with valid layerId, expect return success
     t_ilm_layer displayId = 10;
     t_ilm_int number = MAX_NUMBER;
     ASSERT_EQ(ILM_SUCCESS, ilm_displaySetRenderOrder(displayId, mp_ilmLayerIds, number));
@@ -1455,7 +1454,7 @@ TEST_F(IlmControlTest, ilm_registerNotification_success)
     ilm_context.initialized = true;
     // Invoke the ilm_registerNotification with null notification, expect return success
     ASSERT_EQ(ILM_SUCCESS, ilm_registerNotification(&notificationCallback, nullptr));
-
+    // Invoke the ilm_registerNotification with wl_display_roundtrip_queue return failure, expect return failure
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
     ASSERT_EQ(ILM_FAILED, ilm_registerNotification(&notificationCallback, nullptr));
 }
@@ -1470,31 +1469,34 @@ TEST_F(IlmControlTest, ilm_unregisterNotification_success)
 
 TEST_F(IlmControlTest, ilm_commitChanges_cannotGetRoundTripQueue)
 {
-    // invoke the ilm_commitChanges
+    // invoke the ilm_commitChanges with wl_display_roundtrip_queue return failure, expect return failure
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
     ASSERT_EQ(ILM_FAILED, ilm_commitChanges());
+    // The wl_display_roundtrip_queue should trigger
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
     ASSERT_EQ(mp_failureResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
 
-    // invoke the ilm_commitChanges
+    // invoke the ilm_commitChanges with null controller, expect return failure
     ilm_context.wl.controller = nullptr;
     ASSERT_EQ(ILM_FAILED, ilm_commitChanges());
 }
 
 TEST_F(IlmControlTest, ilm_commitChanges_success)
 {
-    // invoke the ilm_commitChanges
+    // invoke the ilm_commitChanges with wl_display_roundtrip_queue return success, expect return success
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
     ASSERT_EQ(ILM_SUCCESS, ilm_commitChanges());
+    // The wl_display_roundtrip_queue should trigger
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
     ASSERT_EQ(mp_successResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
 }
 
 TEST_F(IlmControlTest, ilm_getError_cannotGetRoundTripQueue)
 {
-    // invoke the ilm_getError
+    // invoke the ilm_getError with wl_display_roundtrip_queue return failure, expect return failure
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_failureResult, 1);
     ASSERT_EQ(ILM_FAILED, ilm_getError());
+    // The wl_display_roundtrip_queue should trigger
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
     ASSERT_EQ(mp_failureResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
 
@@ -1505,9 +1507,10 @@ TEST_F(IlmControlTest, ilm_getError_cannotGetRoundTripQueue)
 
 TEST_F(IlmControlTest, ilm_getError_success)
 {
-    // invoke the ilm_getError
+    // invoke the ilm_getError with wl_display_roundtrip_queue return success, expect return success
     SET_RETURN_SEQ(wl_display_roundtrip_queue, mp_successResult, 1);
     ASSERT_EQ(ILM_SUCCESS, ilm_getError());
+    // The wl_display_roundtrip_queue should trigger
     ASSERT_EQ(1, wl_display_roundtrip_queue_fake.call_count);
     ASSERT_EQ(mp_successResult[0], wl_display_roundtrip_queue_fake.return_val_history[0]);
 }

@@ -76,7 +76,7 @@ public:
 
     t_ilm_string *mp_getSeats = nullptr;
     t_ilm_uint m_numberSeat = 0;
-}; //IlmInputTest
+};
 
 TEST_F(IlmInputTest, ilm_setInputAcceptanceOn_invalidAgrument)
 {

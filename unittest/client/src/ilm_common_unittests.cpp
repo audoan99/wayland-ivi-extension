@@ -42,7 +42,7 @@ public:
     uint8_t m_wlDisplayFakePointer = 0;
     struct wl_display* mpp_wlDisplays [MAX_NUMBER] = {nullptr};
     ilmErrorTypes mp_ilmErrorType[MAX_NUMBER] = {ILM_FAILED};
-}; //IlmCommonTest
+};
 
 TEST_F(IlmCommonTest, ilm_init_cannotGetDisplay)
 {
