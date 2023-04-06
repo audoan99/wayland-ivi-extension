@@ -72,3 +72,7 @@ How to test unit testing
 2. After build successfully, just run the testsuite right away.
    Syntax: <your installation path>/bin/unittest*
    Example: $HOME/install/bin/unittest-ivi-controller
+3. (Optional) To display code coverage results, run shell script in unittest folder
+   Syntax: code_coverage.sh <your build path>
+   (If not passing parameter <your build path>, default folder build will is "wayland-ivi-extension/build_ivi_extension/")
+   Example: $HOME/covesa/wayland-ivi-extension/unittest/code_coverage.sh $HOME/covesa/wayland-ivi-extension/build/
